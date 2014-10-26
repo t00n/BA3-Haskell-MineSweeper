@@ -26,6 +26,7 @@ top cinit = do putStrLn "Enter a seed..."
                putStrLn "First click..."
                firstClick <- readLn -- modified
                loop $ cinit seed (width, height) firstClick -- modified
+               -- should check if first click was good or not
 
 -- A turn
 loop :: Board b => b -> IO ()
@@ -50,11 +51,19 @@ flag_loop (Just coord) board = do putStrLn "Place a flag???"
 data Cell = Flagged | Clicked | Masked
 data MyBoard = MyBoard [[Cell]]
 
+instance Show Cell where
+  show Flagged = "F"
+  show Clicked = "5"
+  show Masked = " "
+
 instance Show MyBoard where
-  show (MyBoard a) = show "caca"
+  show (MyBoard []) = "\n"
+  show (MyBoard (xs:xss)) = (concat $ replicate ((length xs)) "+-") ++ "\n" -- boundaries
+                            ++ (concat $ ["|" ++ (show x) | x <- xs]) ++ "\n" -- values
+                            ++ (show (MyBoard xss)) -- rest of the board
 
 instance Board MyBoard where
-  initialize seed (x,y) (c1,c2) = MyBoard [[Masked]]
+  initialize seed (x,y) (c1,c2) = MyBoard $ replicate x (replicate y Masked)
   click (c1,c2) b = b
   flag (f1,f2) b = b
   won b = False
