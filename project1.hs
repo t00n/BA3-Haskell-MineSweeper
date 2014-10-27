@@ -77,14 +77,14 @@ instance Board MyBoard where
     where nbOfMines = x*y `div` 10
   click (c1,c2) b = b
   flag (f1,f2) b = b
-  won b = foldr wonCell True (concat (val b))
+  won b = foldr wonCell True $ concat $ val b
     where wonCell (Flagged m) acc = acc && m == True
           wonCell (Masked _) _ = False
           wonCell (Clicked x) acc = acc && x >= 0
-  lost b = foldr clickedMine False $ concat $ val b
-    where clickedMine (Flagged _) acc = acc || False
-          clickedMine (Masked _) acc = acc || False
-          clickedMine (Clicked a) acc  = acc || (a == -1)
+  lost b = foldr lostCell False $ concat $ val b
+    where lostCell (Flagged _) acc = acc || False
+          lostCell (Masked _) acc = acc || False
+          lostCell (Clicked a) acc  = acc || (a == -1)
 
 main :: IO()
 main = top (initialize :: Int -> (Int,Int) -> (Int,Int) -> MyBoard)
