@@ -1,4 +1,4 @@
-module Project (Board(initialize, click, flag, won, lost), top) where
+module Main (main) where
 
 ----added
 --import Data.Sequence
@@ -77,8 +77,11 @@ instance Board MyBoard where
     where nbOfMines = x*y `div` 10
   click (c1,c2) b = b
   flag (f1,f2) b = b
-  won b = False
-  lost b = foldr clickedMine False (concat (val b))
+  won b = foldr wonCell True (concat (val b))
+    where wonCell (Flagged m) acc = acc && m == True
+          wonCell (Masked _) _ = False
+          wonCell (Clicked x) acc = acc && x >= 0
+  lost b = foldr clickedMine False $ concat $ val b
     where clickedMine (Flagged _) acc = acc || False
           clickedMine (Masked _) acc = acc || False
           clickedMine (Clicked a) acc  = acc || (a == -1)
