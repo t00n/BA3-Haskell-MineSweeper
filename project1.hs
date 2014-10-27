@@ -1,8 +1,10 @@
 module Main (main) where
 
-----added
---import Data.Sequence
-----
+--added
+import Data.Foldable as DFold (toList, foldr)
+import Data.Sequence as DSeq
+import Control.Monad (join)
+--
 
 
 -- The show instance must be highly customized to display a board in ASCII
@@ -57,7 +59,7 @@ flag_loop (Just coord) board = do putStrLn "Place a flag???"
 -- clicked, mine (-1) or number of adjacent mine
 -- masked, mine or not
 data Cell = Flagged Bool | Clicked Int | Masked Bool
-data MyBoard = MyBoard { val :: [[Cell]] }
+data MyBoard = MyBoard { val :: Seq (Seq Cell) }
 
 instance Show Cell where
   show (Flagged _) = "F"
@@ -67,21 +69,24 @@ instance Show Cell where
   show (Masked _) = " "
 
 instance Show MyBoard where
-  show (MyBoard []) = ""
-  show (MyBoard (xs:xss)) = (concat $ replicate (length xs) "+-") ++ "\n" -- boundaries
-                            ++ (concat $ ["|" ++ (show x) | x <- xs]) ++ "\n" -- values for this line
-                            ++ (show (MyBoard xss)) -- rest of the board
+  show (MyBoard s) 
+    | DSeq.null s = ""
+    | otherwise = (concat $ Prelude.replicate (DSeq.length xs) "+-") ++ "\n" -- boundaries
+                  ++ (concat $ ["|" ++ (show x) | x <- (toList xs)]) ++ "\n" -- values for this line
+                  ++ (show (MyBoard xss)) -- rest of the board
+                  where xs = index s 0
+                        xss = DSeq.drop 1 s
 
 instance Board MyBoard where
-  initialize seed (x,y) (c1,c2) = MyBoard $ replicate x (replicate y (Masked False))
+  initialize seed (x,y) (c1,c2) = MyBoard $ DSeq.replicate x (DSeq.replicate y (Masked False))
     where nbOfMines = x*y `div` 10
   click (c1,c2) b = b
   flag (f1,f2) b = b
-  won b = foldr wonCell True $ concat $ val b
+  won b = DFold.foldr wonCell True $ join $ val b
     where wonCell (Flagged m) acc = acc && m == True
           wonCell (Masked _) _ = False
           wonCell (Clicked x) acc = acc && x >= 0
-  lost b = foldr lostCell False $ concat $ val b
+  lost b = DFold.foldr lostCell False $ join $ val b
     where lostCell (Flagged _) acc = acc || False
           lostCell (Masked _) acc = acc || False
           lostCell (Clicked a) acc  = acc || (a == -1)
