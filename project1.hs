@@ -80,7 +80,15 @@ instance Show MyBoard where
 instance Board MyBoard where
   initialize seed (x,y) (c1,c2) = MyBoard $ DSeq.replicate x (DSeq.replicate y (Masked False))
     where nbOfMines = x*y `div` 10
-  click (c1,c2) b = b
+  click (c1,c2) b = MyBoard $ newMatrix
+    where oldColumn = index (val b) c1
+          oldValue = index oldColumn c2
+          newValue (Masked True) = (Clicked (-1))
+          newValue (Masked False) = (Clicked nbOfAdjacentMines)
+          newValue _ = oldValue
+          nbOfAdjacentMines = 0
+          newColumn = update c2 (newValue oldValue) oldColumn
+          newMatrix = update c1 newColumn $ val b
   flag (f1,f2) b = b
   won b = DFold.foldr wonCell True $ join $ val b
     where wonCell (Flagged m) acc = acc && m == True
