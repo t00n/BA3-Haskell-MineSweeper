@@ -89,7 +89,14 @@ instance Board MyBoard where
           nbOfAdjacentMines = 0
           newColumn = update c2 (newValue oldValue) oldColumn
           newMatrix = update c1 newColumn $ val b
-  flag (f1,f2) b = b
+  flag (c1,c2) b = MyBoard $ newMatrix
+    where oldColumn = index (val b) c1
+          oldValue = index oldColumn c2
+          newValue (Masked x) = (Flagged x)
+          newValue (Flagged x) = (Masked x)
+          newValue _ = oldValue
+          newColumn = update c2 (newValue oldValue) oldColumn
+          newMatrix = update c1 newColumn $ val b
   won b = DFold.foldr wonCell True $ join $ val b
     where wonCell (Flagged m) acc = acc && m == True
           wonCell (Masked _) _ = False
