@@ -1,4 +1,7 @@
 module Main (main) where
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 --added
 import Data.Foldable as DFold (toList, foldr)
@@ -6,6 +9,23 @@ import Data.Sequence as DSeq
 import Control.Monad (join)
 --
 
+data DoubleSeq a = DoubleSeq {
+  toSeq :: Seq a,
+  width :: Int,
+  height :: Int
+} deriving (Show)
+
+class Matrix m a | m -> a where
+  get :: (Int, Int) -> m -> a
+  mod :: (Int, Int) -> a -> m -> m
+  
+instance Matrix (DoubleSeq a) a where
+  get (x, y) m = index s (x*w + y)
+    where s = toSeq m
+          w = width m
+  mod (x, y) b m = DoubleSeq (update (x*w + y) b s) w (height m)
+    where s = toSeq m
+          w = width m
 
 -- The show instance must be highly customized to display a board in ASCII
 class Show b => Board b where
