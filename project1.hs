@@ -1,16 +1,20 @@
-module Main (main) where
+module Main where
 
 --added
-import Data.Foldable as DFold (toList, foldr)
-import Data.Sequence as DSeq
+import Data.Foldable as Fold (foldr)
+import Data.Vector as Vec hiding ((++), concat, update)
 import Control.Monad (join)
 --
 
 
 -- The show instance must be highly customized to display a board in ASCII
-class Show b => Board b where
+class Show b => Board b a | b -> a where
   -- Create a board from seed, dimension and first click (avoid immediate loosing)
   initialize :: Int -> (Int, Int) -> (Int, Int) -> b
+  -- Get value of a cell (not secured)
+  get :: (Int, Int) -> b -> a
+  -- Update a cell on the board with a value (no effect if out-of-bounds)
+  update :: (Int, Int) -> a -> b -> b
   -- Click a cell on the board (no effect if out-of-bounds)
   click :: (Int,Int) -> b -> b
   -- Flag a cell on the board (no effect if out-of-bounds)
@@ -22,7 +26,7 @@ class Show b => Board b where
 
 -- Create a main function by given a your initialize implementation
 -- e.g.: main = top (initialize :: Int -> (Int,Int) -> (Int,Int) -> MyBoard)
-top :: Board b => (Int -> (Int, Int) -> (Int, Int) -> b) -> IO ()
+top :: Board b a => (Int -> (Int, Int) -> (Int, Int) -> b) -> IO ()
 top cinit = do putStrLn "Enter a seed..."
                seed <- readLn
                putStrLn "Enter the width of the board"
@@ -35,18 +39,18 @@ top cinit = do putStrLn "Enter a seed..."
                -- should check if first click was good or not
 
 -- A turn
-loop :: Board b => b -> IO ()
+loop :: Board b a => b -> IO ()
 loop board
   | won board  = putStrLn $ show board ++ "\n Gratz, you won!!!"
   | lost board = putStrLn $ show board ++ "\n Soz, you lost..."
   | otherwise  = do putStrLn $ show board
-                    flag_loop (Just (-1, -1)) board
+                    board <- flag_loop (Just (-1, -1)) board -- modified
                     putStrLn "Click..."
                     coord <- readLn
                     loop $ click coord board
 
 -- Place flags
-flag_loop :: Board b => Maybe (Int, Int) -> b -> IO b
+flag_loop :: Board b a => Maybe (Int, Int) -> b -> IO b
 flag_loop Nothing board = return board
 flag_loop (Just coord) board = do putStrLn "Place a flag???"
                                   mcoord <- readLn
@@ -59,7 +63,11 @@ flag_loop (Just coord) board = do putStrLn "Place a flag???"
 -- clicked, mine (-1) or number of adjacent mine
 -- masked, mine or not
 data Cell = Flagged Bool | Clicked Int | Masked Bool
-data MyBoard = MyBoard { val :: Seq (Seq Cell) }
+data MyBoard = MyBoard { 
+  val :: Vector Cell,
+  width :: Int,
+  height :: Int
+}
 
 instance Show Cell where
   show (Flagged _) = "F"
@@ -69,39 +77,42 @@ instance Show Cell where
   show (Masked _) = " "
 
 instance Show MyBoard where
-  show (MyBoard s) 
-    | DSeq.null s = ""
-    | otherwise = (concat $ Prelude.replicate (DSeq.length xs) "+-") ++ "\n" -- boundaries
-                  ++ (concat $ ["|" ++ (show x) | x <- (toList xs)]) ++ "\n" -- values for this line
-                  ++ (show (MyBoard xss)) -- rest of the board
-                  where xs = index s 0
-                        xss = DSeq.drop 1 s
+  show b 
+    | height b == 0 = ""
+    | otherwise = (concat $ Prelude.replicate w "+-") ++ "\n" -- boundaries
+                  ++ (concat $ toList $ Vec.map ("|" ++) $ Vec.map show xs) ++ "\n" -- values for this line
+                  ++ (show (MyBoard xss w newH)) -- rest of the board
+                  where (xs, xss) = Vec.splitAt w (val b)
+                        w = width b
+                        newH = (height b)-1
 
-instance Board MyBoard where
-  initialize seed (x,y) (c1,c2) = MyBoard $ DSeq.replicate x (DSeq.replicate y (Masked False))
+instance Board MyBoard Cell where
+  initialize seed (x,y) (c1,c2) = MyBoard (Vec.replicate (x*y) (Masked False)) x y
     where nbOfMines = x*y `div` 10
-  click (c1,c2) b = MyBoard $ newMatrix
-    where oldColumn = index (val b) c1
-          oldValue = index oldColumn c2
+  get (x, y) b = (val b) ! (x*w + y)
+    where w = width b
+  update (x, y) a b 
+    | x < 0 || y < 0 || x >= (width b) || y >= (height b) = b
+    | otherwise = MyBoard ((val b) // [(i, a)]) w h
+      where w = width b
+            h = height b
+            i = x*w + y
+  click (x, y) b = update (x, y) (newValue oldValue) b
+    where oldValue = get (x, y) b
           newValue (Masked True) = (Clicked (-1))
           newValue (Masked False) = (Clicked nbOfAdjacentMines)
           newValue _ = oldValue
           nbOfAdjacentMines = 0
-          newColumn = update c2 (newValue oldValue) oldColumn
-          newMatrix = update c1 newColumn $ val b
-  flag (c1,c2) b = MyBoard $ newMatrix
-    where oldColumn = index (val b) c1
-          oldValue = index oldColumn c2
+  flag (x, y) b = update (x, y) (newValue oldValue) b
+    where oldValue = get (x, y) b
           newValue (Masked x) = (Flagged x)
           newValue (Flagged x) = (Masked x)
           newValue _ = oldValue
-          newColumn = update c2 (newValue oldValue) oldColumn
-          newMatrix = update c1 newColumn $ val b
-  won b = DFold.foldr wonCell True $ join $ val b
+  won b = Fold.foldr wonCell True $ val b
     where wonCell (Flagged m) acc = acc && m == True
           wonCell (Masked _) _ = False
           wonCell (Clicked x) acc = acc && x >= 0
-  lost b = DFold.foldr lostCell False $ join $ val b
+  lost b = Fold.foldr lostCell False $ val b
     where lostCell (Flagged _) acc = acc || False
           lostCell (Masked _) acc = acc || False
           lostCell (Clicked a) acc  = acc || (a == -1)
