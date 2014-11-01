@@ -89,27 +89,20 @@ instance Show MyBoard where
                         w = width b
                         newH = (height b)-1
 
-removeDuplicates::Ord a => [(a, b)]->[(a, b)]
-removeDuplicates theList = [x|(Just x, _, _) <- iterate getNext (Nothing, theList, [])]
-  where 
-    getNext (_, x:xs, used) 
-      | fst x `Prelude.elem` used = (Nothing, xs, used)
-      | otherwise = (Just x, xs, (fst x):used)
-
-uniqueRandomInts :: (RandomGen g) => (Int, Int) -> Int -> g -> [Int]
-uniqueRandomInts range n g = Prelude.map fst . Prelude.take n . removeDuplicates . iterate getNext $ randomR range g
-  where getNext = randomR range . snd
-
-
 instance Board MyBoard Cell where
   initialize seed (x,y) (c1,c2) = MyBoard s x y
-    where nbOfMines = x*y `div` 6 + 1
-          gen = uniqueRandomInts (0, x*y-1) nbOfMines (mkStdGen seed)
-          s = generate (x*y-1) placeMine
-          placeMine i
-            | i `Prelude.elem` gen && i /= (c1*x + c2) = (Masked True)
-            | otherwise = (Masked False)
-          --s = Prelude.foldr (\x xs -> xs // [(x, (Masked True))]) (Vec.replicate (x*y-1) (Masked False)) gen
+    where nbOfMines = x*y `div` 6
+          firstClick = c1*x + c2
+          size = x*y-1
+          range = (0, size)
+          removeDuplicates aList = [x|(Just x, _, _) <- iterate getNext (Nothing, aList, [])]
+            where getNext (_, x:xs, used) 
+                    | fst x `Prelude.elem` used || fst x == firstClick = (Nothing, xs, used)
+                    | otherwise = (Just x, xs, (fst x):used)
+          uniqueRandomInts = Prelude.map fst . Prelude.take nbOfMines . removeDuplicates . iterate getNext . randomR range
+            where getNext = randomR range . snd
+          gen = uniqueRandomInts (mkStdGen seed)
+          s = generate size (\i -> if i `Prelude.elem` gen then (Masked True) else (Masked False))
   get (x, y) b = (val b) ! (x*w + y)
     where w = width b
   update (x, y) a b 
