@@ -64,7 +64,7 @@ flag_loop (Just coord) board = do putStrLn "Place a flag???"
 -- flagged, mine or not
 -- clicked, mine (-1) or number of adjacent mine
 -- masked, mine or not
-data Cell = Flagged Bool | Clicked Int | Masked Bool
+data Cell = Flagged Bool | Clicked Int | Masked Bool deriving (Eq)
 data MyBoard = MyBoard { 
   val :: Vector Cell,
   width :: Int,
@@ -116,7 +116,10 @@ instance Board MyBoard Cell where
           newValue (Masked True) = (Clicked (-1))
           newValue (Masked False) = (Clicked nbOfAdjacentMines)
           newValue _ = oldValue
-          nbOfAdjacentMines = 0
+          nbOfAdjacentMines = Fold.foldr (\x acc -> if x == (Masked True) || x == (Flagged True) then acc+1 else acc) 0 xs
+          xs = [(val b) ! (i*w+j) | i <- [(x-1)..(x+1)], j <- [(y-1)..(y+1)], i*w+j >= 0, i*w+j < size]
+          w = width b
+          size = w * (height b) -1
   flag (x, y) b = update (x, y) (newValue oldValue) b
     where oldValue = get (x, y) b
           newValue (Masked x) = (Flagged x)
