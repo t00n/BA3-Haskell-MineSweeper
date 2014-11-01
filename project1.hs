@@ -2,8 +2,10 @@ module Main where
 
 --added
 import Data.Foldable as Fold (foldr)
-import Data.Vector as Vec hiding ((++), concat, update)
+import Data.Vector as Vec hiding ((++), concat, update, fromList)
 import Control.Monad (join)
+import System.Random
+import Data.Set as Set (fromList, toList)
 --
 
 
@@ -74,21 +76,40 @@ instance Show Cell where
   show (Clicked x)
     | x == -1 = "M"
     | otherwise = show x
-  show (Masked _) = " "
+  show (Masked False) = " "
+  show (Masked True) = "M"
 
 instance Show MyBoard where
   show b 
     | height b == 0 = ""
     | otherwise = (concat $ Prelude.replicate w "+-") ++ "\n" -- boundaries
-                  ++ (concat $ toList $ Vec.map ("|" ++) $ Vec.map show xs) ++ "\n" -- values for this line
+                  ++ (concat $ Vec.toList $ Vec.map ("|" ++) $ Vec.map show xs) ++ "\n" -- values for this line
                   ++ (show (MyBoard xss w newH)) -- rest of the board
                   where (xs, xss) = Vec.splitAt w (val b)
                         w = width b
                         newH = (height b)-1
 
+removeDuplicates::Ord a => [(a, b)]->[(a, b)]
+removeDuplicates theList = [x|(Just x, _, _) <- iterate getNext (Nothing, theList, [])]
+  where 
+    getNext (_, x:xs, used) 
+      | fst x `Prelude.elem` used = (Nothing, xs, used)
+      | otherwise = (Just x, xs, (fst x):used)
+
+uniqueRandomInts :: (RandomGen g) => (Int, Int) -> Int -> g -> [Int]
+uniqueRandomInts range n g = Prelude.map fst . Prelude.take n . removeDuplicates . iterate getNext $ randomR range g
+  where getNext = randomR range . snd
+
+
 instance Board MyBoard Cell where
-  initialize seed (x,y) (c1,c2) = MyBoard (Vec.replicate (x*y) (Masked False)) x y
-    where nbOfMines = x*y `div` 10
+  initialize seed (x,y) (c1,c2) = MyBoard s x y
+    where nbOfMines = x*y `div` 6 + 1
+          gen = uniqueRandomInts (0, x*y-1) nbOfMines (mkStdGen seed)
+          s = generate (x*y-1) placeMine
+          placeMine i
+            | i `Prelude.elem` gen && i /= (c1*x + c2) = (Masked True)
+            | otherwise = (Masked False)
+          --s = Prelude.foldr (\x xs -> xs // [(x, (Masked True))]) (Vec.replicate (x*y-1) (Masked False)) gen
   get (x, y) b = (val b) ! (x*w + y)
     where w = width b
   update (x, y) a b 
