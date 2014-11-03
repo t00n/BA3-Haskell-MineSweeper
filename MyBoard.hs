@@ -53,7 +53,7 @@ instance Board MyBoard Cell where
   initialize seed (width,height) (c1,c2) = click (c1, c2) (MyBoard vec width height)
     where nbOfMines = width*height `div` 4 -- 4 is a magic number !
           firstClick = c1*width + c2
-          sizeVec = width*height-1
+          sizeVec = width*height
           randomList = uniqueRandomInts firstClick (0, sizeVec) nbOfMines (mkStdGen seed)
           vec = generate sizeVec (\i -> if i `elem` randomList then (Masked True) else (Masked False))
   get (x, y) b = (val b) ! (x*w + y)
@@ -66,12 +66,12 @@ instance Board MyBoard Cell where
             i = x*w + y
   click (x, y) b
     | nbOfAdjacentMines /= 0 = update (x, y) (newValue oldValue) b
-    | otherwise = Fold.foldr (\x acc -> click x acc) (update (x, y) (newValue oldValue) b) neighbours
+    | otherwise = Fold.foldr (\x acc -> if (get x acc) == (Masked False) then click x acc else acc) (update (x, y) (newValue oldValue) b) neighbours
       where oldValue = get (x, y) b
             newValue (Masked True) = (Clicked (-1))
             newValue (Masked False) = (Clicked nbOfAdjacentMines)
             newValue _ = oldValue
-            nbOfAdjacentMines = Fold.foldr (\x acc -> if x == (Masked True) || x == (Flagged True) then acc+1 else acc) 0 [(val b) ! (i*w+j) | (i,j) <- neighbours]
+            nbOfAdjacentMines = Fold.foldr (\c acc -> if c == (Masked True) || c == (Flagged True) then acc+1 else acc) 0 [(val b) ! (i*w+j) | (i,j) <- neighbours]
             neighbours = [(i, j) | i <- [(x-1)..(x+1)], j <- [(y-1)..(y+1)], i >= 0, i < w, j >= 0, j < h, (i, j) /= (x,y)]
             w = width b
             h = height b
