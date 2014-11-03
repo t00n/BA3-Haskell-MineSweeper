@@ -1,6 +1,5 @@
 module MyBoard where
 
-import Data.Foldable as Fold (foldr)
 import Data.Vector as Vec hiding ((++), concat, update, replicate, take, elem, map)
 import System.Random
 
@@ -20,11 +19,8 @@ data MyBoard = MyBoard {
 
 instance Show Cell where
   show (Flagged _) = "F"
-  show (Clicked x)
-    | x == -1 = "M"
-    | otherwise = show x
-  show (Masked False) = " "
-  show (Masked True) = "M"
+  show (Clicked x) = show x
+  show (Masked _) = " "
 
 -- display a beautiful board
 instance Show MyBoard where
@@ -66,12 +62,12 @@ instance Board MyBoard Cell where
             i = x*w + y
   click (x, y) b
     | nbOfAdjacentMines /= 0 = update (x, y) (newValue oldValue) b
-    | otherwise = Fold.foldr (\x acc -> if (get x acc) == (Masked False) then click x acc else acc) (update (x, y) (newValue oldValue) b) neighbours
+    | otherwise = Prelude.foldr (\x acc -> if (get x acc) == (Masked False) then click x acc else acc) (update (x, y) (newValue oldValue) b) neighbours
       where oldValue = get (x, y) b
             newValue (Masked True) = (Clicked (-1))
             newValue (Masked False) = (Clicked nbOfAdjacentMines)
             newValue _ = oldValue
-            nbOfAdjacentMines = Fold.foldr (\c acc -> if c == (Masked True) || c == (Flagged True) then acc+1 else acc) 0 [(val b) ! (i*w+j) | (i,j) <- neighbours]
+            nbOfAdjacentMines = Prelude.foldr (\c acc -> if c == (Masked True) || c == (Flagged True) then acc+1 else acc) 0 [(val b) ! (i*w+j) | (i,j) <- neighbours]
             neighbours = [(i, j) | i <- [(x-1)..(x+1)], j <- [(y-1)..(y+1)], i >= 0, i < w, j >= 0, j < h, (i, j) /= (x,y)]
             w = width b
             h = height b
@@ -80,11 +76,11 @@ instance Board MyBoard Cell where
           newValue (Masked x) = (Flagged x)
           newValue (Flagged x) = (Masked x)
           newValue _ = oldValue
-  won b = Fold.foldr wonCell True $ val b
+  won b = Vec.foldr wonCell True $ val b
     where wonCell (Flagged m) acc = acc && m == True
           wonCell (Masked _) _ = False
           wonCell (Clicked x) acc = acc && x >= 0
-  lost b = Fold.foldr lostCell False $ val b
+  lost b = Vec.foldr lostCell False $ val b
     where lostCell (Flagged _) acc = acc || False
           lostCell (Masked _) acc = acc || False
           lostCell (Clicked a) acc  = acc || (a == -1)
