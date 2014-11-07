@@ -1,6 +1,6 @@
 module MyBoard where
 
-import Data.Vector as Vec hiding ((++), concat, update, replicate, take, elem, map)
+import Data.Vector as Vec hiding ((++), concat, update, replicate, take, elem, map, concatMap)
 import System.Random
 
 import Board
@@ -25,13 +25,14 @@ instance Show Cell where
 -- display a beautiful board
 instance Show MyBoard where
   show b 
-    | height b == 0 = ""
-    | otherwise = (concat $ replicate w "+-") ++ "\n" -- boundaries
-                  ++ (concat $ map ("|" ++) $ map show (toList xs)) ++ "\n" -- values for this line
+    | height b == 0 = boundariesH
+    | otherwise = boundariesH
+                  ++ (concatMap ('|':) $ map show $ toList xs) ++ "|\n" -- values for this line
                   ++ (show (MyBoard xss w newH)) -- rest of the board
                   where (xs, xss) = Vec.splitAt w (val b)
                         w = width b
                         newH = (height b)-1
+                        boundariesH = '+' : (concat $ replicate w "-+") ++ "\n"
 
 -- remove duplicates and one specified exception in a iterate-generated list (one at a time)
 removeDuplicates :: Eq a => a -> [(a, b)] -> [(a, b)]
