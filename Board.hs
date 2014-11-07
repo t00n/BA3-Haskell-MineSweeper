@@ -16,3 +16,5 @@ class Show b => Board b a | b -> a where
   won :: b -> Bool
   -- Test if a mined cell has been clicked
   lost :: b -> Bool
+  -- Show the entire board at the end of game
+  endShow :: b -> String

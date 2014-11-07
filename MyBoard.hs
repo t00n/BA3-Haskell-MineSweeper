@@ -102,3 +102,4 @@ instance Board MyBoard Cell where
     where lostCell (Flagged _) acc = acc || False
           lostCell (Masked _) acc = acc || False
           lostCell (Clicked a) acc  = acc || (a == -1)
+  endShow b = show $ Prelude.foldr click b [(i, j) | i <- [0..(width b)], j <- [0..(height b)]]

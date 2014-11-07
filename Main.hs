@@ -20,8 +20,8 @@ top cinit = do putStrLn "Enter a seed..."
 -- A turn
 loop :: Board b a => b -> IO ()
 loop board
-  | won board  = putStrLn $ show board ++ "\n Gratz, you won!!!"
-  | lost board = putStrLn $ show board ++ "\n Soz, you lost..."
+  | won board  = putStrLn $ endShow board ++ "\n Gratz, you won!!!"
+  | lost board = putStrLn $ endShow board ++ "\n Soz, you lost..."
   | otherwise  = do board <- flag_loop (Just (-1, -1)) board -- modified
                     putStrLn $ (show board) ++ "Click..." -- modified
                     coord <- readLn
