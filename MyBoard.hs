@@ -19,7 +19,9 @@ data MyBoard = MyBoard {
 
 instance Show Cell where
   show (Flagged _) = "F"
-  show (Clicked x) = show x
+  show (Clicked x) 
+    | x == -1 = "M"
+    | otherwise = show x
   show (Masked _) = " "
 
 -- display a beautiful board
@@ -47,7 +49,7 @@ generateUniqueRandom exception range n = map fst . take n . filterDuplicates exc
   where getNext = randomR range . snd
 
 instance Board MyBoard Cell where
-  initialize seed (width,height) (c1,c2) = click (c1, c2) (MyBoard vec width height)
+  initialize seed (width,height) (c1,c2) = click (c1,c2) (MyBoard vec width height)
     where nbOfMines = width*height `div` 4 -- 4 is a magic number !
           firstClick = c1*width + c2
           sizeVec = width*height
@@ -75,7 +77,7 @@ instance Board MyBoard Cell where
             newBoard = update (x, y) (newValue oldValue) b
             neighboursIndex = [(i, j) | i <- [(x-1)..(x+1)], j <- [(y-1)..(y+1)], i >= 0, i < w, j >= 0, j < h, (i, j) /= (x, y)]
             neighbours = [get i b | i <- neighboursIndex]
-            nbOfAdjacentMines = Prelude.foldr (\c acc -> if c == (Masked True) || c == (Flagged True) then acc+1 else acc) 0 neighbours
+            nbOfAdjacentMines = Prelude.foldr (\c acc -> if c == (Masked True) || c == (Flagged True) || c == (Clicked (-1)) then acc+1 else acc) 0 neighbours
             w = width b
             h = height b
 
