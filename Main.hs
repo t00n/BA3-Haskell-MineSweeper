@@ -22,16 +22,15 @@ loop :: Board b a => b -> IO ()
 loop board
   | won board  = putStrLn $ show board ++ "\n Gratz, you won!!!"
   | lost board = putStrLn $ show board ++ "\n Soz, you lost..."
-  | otherwise  = do putStrLn $ show board
-                    board <- flag_loop (Just (-1, -1)) board -- modified
-                    putStrLn "Click..."
+  | otherwise  = do board <- flag_loop (Just (-1, -1)) board -- modified
+                    putStrLn $ (show board) ++ "Click..." -- modified
                     coord <- readLn
                     loop $ click coord board
 
 -- Place flags
 flag_loop :: Board b a => Maybe (Int, Int) -> b -> IO b
 flag_loop Nothing board = return board
-flag_loop (Just coord) board = do putStrLn "Place a flag???"
+flag_loop (Just coord) board = do putStrLn $ (show board) ++ "Place a flag???" -- modified
                                   mcoord <- readLn
                                   flag_loop mcoord (flag coord board)
 
