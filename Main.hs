@@ -15,7 +15,6 @@ top cinit = do putStrLn "Enter a seed..."
                putStrLn "First click..."
                firstClick <- readLn -- modified
                loop $ cinit seed (width, height) firstClick -- modified
-               -- should check if first click was good or not
 
 -- A turn
 loop :: Board b a => b -> IO ()
