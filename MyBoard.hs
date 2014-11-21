@@ -1,6 +1,6 @@
 module MyBoard where
 
-import Data.Vector as Vec hiding ((++), concat, update, replicate, take, elem, map, concatMap)
+import Data.Vector as Vec hiding ((++), concat, set, replicate, take, elem, map, concatMap, filter, length)
 import System.Random
 
 import Board
@@ -43,26 +43,31 @@ filterDuplicates exception aList = [x|(Just x, _, _) <- iterate getNext (Nothing
           | fst x `elem` used || fst x == exception = (Nothing, xs, used)
           | otherwise = (Just x, xs, (fst x):used)
 
--- generate a list of random Ints of size "n" in range "range" excluding duplicates and "exception"
+-- generate a list of random ints of size "n" in range "range" excluding duplicates and "exception"
 generateUniqueRandom :: (Random a, Eq a, RandomGen b) => a -> (a, a) -> Int -> b -> [a]
 generateUniqueRandom exception range n = map fst . take n . filterDuplicates exception . iterate getNext . randomR range
   where getNext = randomR range . snd
 
 instance Board MyBoard Cell where
+  -- initialize the board using a list of unique random numbers excluding the first click.
+  -- random numbers are used as indices of mines in the board
   initialize seed (width,height) (c1,c2) = click (c1,c2) (MyBoard vec width height)
-    where nbOfMines = width*height `div` 4 -- 4 is a magic number !
-          firstClick = c1*width + c2
+    where vec = generate sizeVec (\i -> if i `elem` randomList then (Masked True) else (Masked False)) 
           sizeVec = width*height
           randomList = generateUniqueRandom firstClick (0, sizeVec) nbOfMines (mkStdGen seed)
-          vec = generate sizeVec (\i -> if i `elem` randomList then (Masked True) else (Masked False))
-  get (x, y) b = (val b) ! (x*w + y)
-    where w = width b
-  update (x, y) a b 
+          nbOfMines = sizeVec `div` 4 -- 4 is a magic number !
+          firstClick = c1*width + c2
+
+  -- get a cell of the board
+  get (x, y) b = (val b) ! (x*(width b) + y)
+  -- set a cell of the board
+  set (x, y) a b 
     | x < 0 || y < 0 || x >= w || y >= h = b
     | otherwise = MyBoard ((val b) // [(i, a)]) w h
-      where w = width b
+      where i = x*w + y
+            w = width b
             h = height b
-            i = x*w + y
+
   -- click on a cell
   -- if masked -> click
   -- if flagged or clicked -> impossible to click
@@ -70,22 +75,22 @@ instance Board MyBoard Cell where
   click (x, y) b
     | nbOfAdjacentMines /= 0 = newBoard
     | otherwise = Prelude.foldr (\x acc -> if (get x acc) == (Masked False) then click x acc else acc) newBoard neighboursIndex
-      where oldValue = get (x, y) b
+      where nbOfAdjacentMines = length $ filter (\c -> c == (Masked True) || c == (Flagged True) || c == (Clicked (-1))) neighbours
+            newBoard = set (x, y) (newValue oldValue) b
+            neighboursIndex = [(i, j) | i <- [(x-1)..(x+1)], j <- [(y-1)..(y+1)], i >= 0, i < w, j >= 0, j < h, (i, j) /= (x, y)]
+            neighbours = [get i b | i <- neighboursIndex]
+            w = width b
+            h = height b
+            oldValue = get (x, y) b
             newValue (Masked True) = (Clicked (-1))
             newValue (Masked False) = (Clicked nbOfAdjacentMines)
             newValue _ = oldValue
-            newBoard = update (x, y) (newValue oldValue) b
-            neighboursIndex = [(i, j) | i <- [(x-1)..(x+1)], j <- [(y-1)..(y+1)], i >= 0, i < w, j >= 0, j < h, (i, j) /= (x, y)]
-            neighbours = [get i b | i <- neighboursIndex]
-            nbOfAdjacentMines = Prelude.foldr (\c acc -> if c == (Masked True) || c == (Flagged True) || c == (Clicked (-1)) then acc+1 else acc) 0 neighbours
-            w = width b
-            h = height b
 
   -- flag a cell
   -- if masked -> flag
   -- if flagged -> mask
   -- if clicked -> impossible to flag
-  flag (x, y) b = update (x, y) (newValue oldValue) b
+  flag (x, y) b = set (x, y) (newValue oldValue) b
     where oldValue = get (x, y) b
           newValue (Masked x) = (Flagged x)
           newValue (Flagged x) = (Masked x)
