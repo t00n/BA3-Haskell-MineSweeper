@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
+
 module Board where
 
 -- The show instance must be highly customized to display a board in ASCII

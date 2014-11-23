@@ -1,6 +1,9 @@
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
+
 module MyBoard where
 
-import Data.Vector as Vec hiding ((++), concat, set, replicate, take, elem, map, concatMap, filter, length)
+import Data.Sequence as Seq hiding((++), concat, set, replicate, take, elem, map, concatMap, filter, length)
+import Data.Foldable as Fold (toList, foldr)
 import System.Random
 
 import Board
@@ -12,7 +15,7 @@ import Board
 data Cell = Flagged Bool | Clicked Int | Masked Bool deriving (Eq)
 
 data MyBoard = MyBoard { 
-  val :: Vector Cell,
+  val :: Seq Cell,
   width :: Int,
   height :: Int
 }
@@ -31,7 +34,7 @@ instance Show MyBoard where
     | otherwise = boundariesH
                   ++ (concatMap ('|':) $ map show $ toList xs) ++ "|\n" -- values for this line
                   ++ (show (MyBoard xss w newH)) -- rest of the board
-                  where (xs, xss) = Vec.splitAt w (val b)
+                  where (xs, xss) = Seq.splitAt w (val b)
                         w = width b
                         newH = (height b)-1
                         boundariesH = '+' : (concat $ replicate w "-+") ++ "\n"
@@ -48,22 +51,26 @@ generateUniqueRandom :: (Random a, Eq a, RandomGen b) => a -> (a, a) -> Int -> b
 generateUniqueRandom exception range n = map fst . take n . filterDuplicates exception . iterate getNext . randomR range
   where getNext = randomR range . snd
 
+generate :: Int -> (Int -> a) -> Seq a
+generate 0 f = Seq.empty
+generate n f = fromList ([f n]) >< (generate (n-1) f)
+
 instance Board MyBoard Cell where
   -- initialize the board using a list of unique random numbers excluding the first click.
   -- random numbers are used as indices of mines in the board
-  initialize seed (width,height) (c1,c2) = click (c1,c2) (MyBoard vec width height)
-    where vec = generate sizeVec (\i -> if i `elem` randomList then (Masked True) else (Masked False)) 
+  initialize seed (width,height) (c1,c2) = click (c1,c2) (MyBoard sek width height)
+    where sek = generate sizeVec (\i -> if i `elem` randomList then (Masked True) else (Masked False)) 
           sizeVec = width*height
           randomList = generateUniqueRandom firstClick (0, sizeVec) nbOfMines (mkStdGen seed)
           nbOfMines = sizeVec `div` 4 -- 4 is a magic number !
           firstClick = c1*width + c2
 
   -- get a cell of the board
-  get (x, y) b = (val b) ! (x*(width b) + y)
+  get (x, y) b = index (val b) (x*(width b) + y)
   -- set a cell of the board
   set (x, y) a b 
     | x < 0 || y < 0 || x >= w || y >= h = b
-    | otherwise = MyBoard ((val b) // [(i, a)]) w h
+    | otherwise = MyBoard (update i a (val b)) w h
       where i = x*w + y
             w = width b
             h = height b
@@ -97,13 +104,13 @@ instance Board MyBoard Cell where
           newValue _ = oldValue
   -- check if game is won
   -- if each flagged cell is a mine and each clicked cell is not a mine and there are no masked cell
-  won b = Vec.foldr wonCell True $ val b
+  won b = Fold.foldr wonCell True $ val b
     where wonCell (Flagged m) acc = acc && m == True
           wonCell (Masked _) _ = False
           wonCell (Clicked x) acc = acc && x >= 0
   -- check if game is lost
   -- if a clicked cell is a mine
-  lost b = Vec.foldr lostCell False $ val b
+  lost b = Fold.foldr lostCell False $ val b
     where lostCell (Flagged _) acc = acc || False
           lostCell (Masked _) acc = acc || False
           lostCell (Clicked a) acc  = acc || (a == -1)

@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
+
 module Main (main) where
 
 import Board
