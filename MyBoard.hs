@@ -51,13 +51,16 @@ generateUniqueRandom :: (Random a, Eq a, RandomGen b) => a -> (a, a) -> Int -> b
 generateUniqueRandom exception range n = map fst . take n . filterDuplicates exception . iterate getNext . randomR range
   where getNext = randomR range . snd
 
+
+-- geenerate a Data.Sequence a size 'n' using function 'f'
 generate :: Int -> (Int -> a) -> Seq a
 generate 0 f = Seq.empty
-generate n f = fromList ([f n]) >< (generate (n-1) f)
+generate n f = (generate (n-1) f) >< singleton (f n)
 
 instance Board MyBoard Cell where
-  -- initialize the board using a list of unique random numbers excluding the first click.
-  -- random numbers are used as indices of mines in the board
+  -- initialize the board using a list of unique random numbers excluding the first click. This guarantee that boards
+  -- of a certain size will always have the same number of mines
+  -- random numbers are indices of cells where to place the mines
   initialize seed (width,height) (c1,c2) = click (c1,c2) (MyBoard sek width height)
     where sek = generate sizeVec (\i -> if i `elem` randomList then (Masked True) else (Masked False)) 
           sizeVec = width*height
@@ -102,17 +105,20 @@ instance Board MyBoard Cell where
           newValue (Masked x) = (Flagged x)
           newValue (Flagged x) = (Masked x)
           newValue _ = oldValue
+
   -- check if game is won
-  -- if each flagged cell is a mine and each clicked cell is not a mine and there are no masked cell
+  -- game is won if each flagged cell is a mine and each clicked cell is not a mine and there are no masked cell
   won b = Fold.foldr wonCell True $ val b
     where wonCell (Flagged m) acc = acc && m == True
           wonCell (Masked _) _ = False
           wonCell (Clicked x) acc = acc && x >= 0
+
   -- check if game is lost
-  -- if a clicked cell is a mine
+  -- game is lost if a clicked cell is a mine
   lost b = Fold.foldr lostCell False $ val b
     where lostCell (Flagged _) acc = acc || False
           lostCell (Masked _) acc = acc || False
           lostCell (Clicked a) acc  = acc || (a == -1)
+
   -- click on every cell to show the entire board at the end of game
   reveal b = Prelude.foldr click b [(i, j) | i <- [0..(width b)], j <- [0..(height b)]]
