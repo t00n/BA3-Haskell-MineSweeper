@@ -55,7 +55,7 @@ generateUniqueRandom exception range n = map fst . take n . filterDuplicates exc
 -- geenerate a Data.Sequence a size 'n' using function 'f'
 generate :: Int -> (Int -> a) -> Seq a
 generate 0 f = Seq.empty
-generate n f = (generate (n-1) f) >< singleton (f n)
+generate n f = fromList ([f n]) >< (generate (n-1) f)
 
 instance Board MyBoard Cell where
   -- initialize the board using a list of unique random numbers excluding the first click. This guarantee that boards
