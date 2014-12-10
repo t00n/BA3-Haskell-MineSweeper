@@ -2,8 +2,6 @@
 
 module MyBoard where
 
-import Data.Sequence as Seq hiding((++), concat, set, replicate, take, elem, map, concatMap, filter, length)
-import Data.Foldable as Fold (toList, foldr)
 import System.Random
 
 import Board
@@ -15,7 +13,7 @@ import Board
 data Cell = Flagged Bool | Clicked Int | Masked Bool deriving (Eq)
 
 data MyBoard = MyBoard { 
-  val :: Seq Cell,
+  val :: [[Cell]],
   width :: Int,
   height :: Int
 }
@@ -32,9 +30,9 @@ instance Show MyBoard where
   show b 
     | height b == 0 = boundariesH
     | otherwise = boundariesH
-                  ++ (concatMap ('|':) $ map show $ toList xs) ++ "|\n" -- values for this line
+                  ++ (concatMap ('|':) $ map show xs) ++ "|\n" -- values for this line
                   ++ (show (MyBoard xss w newH)) -- rest of the board
-                  where (xs, xss) = Seq.splitAt w (val b)
+                  where xs:xss = val b
                         w = width b
                         newH = (height b)-1
                         boundariesH = '+' : (concat $ replicate w "-+") ++ "\n"
@@ -52,31 +50,27 @@ generateUniqueRandom exception range n = map fst . take n . filterDuplicates exc
   where getNext = randomR range . snd
 
 
--- geenerate a Data.Sequence a size 'n' using function 'f'
-generate :: Int -> (Int -> a) -> Seq a
-generate 0 f = Seq.empty
-generate n f = fromList ([f n]) >< (generate (n-1) f)
-
 instance Board MyBoard Cell where
   -- initialize the board using a list of unique random numbers excluding the first click. This guarantee that boards
   -- of a certain size will always have the same number of mines
   -- random numbers are indices of cells where to place the mines
-  initialize seed (width,height) (c1,c2) = click (c1,c2) (MyBoard sek width height)
-    where sek = generate sizeVec (\i -> if i `elem` randomList then (Masked True) else (Masked False)) 
+  initialize seed (width,height) (c1,c2) = click (c1,c2) (MyBoard list width height)
+    where list = [[(if (j*width+i) `elem` randomList then (Masked True) else (Masked False)) | j <- [0..(height-1)]] | i <- [0..(width-1)]]
           sizeVec = width*height
           randomList = generateUniqueRandom firstClick (0, sizeVec) nbOfMines (mkStdGen seed)
           nbOfMines = sizeVec `div` 4 -- 4 is a magic number !
           firstClick = c1*width + c2
 
   -- get a cell of the board
-  get (x, y) b = index (val b) (x*(width b) + y)
+  get (x, y) b = ((val b) !! x) !! y
   -- set a cell of the board
   set (x, y) a b 
     | x < 0 || y < 0 || x >= w || y >= h = b
-    | otherwise = MyBoard (update i a (val b)) w h
-      where i = x*w + y
-            w = width b
-            h = height b
+    | otherwise = MyBoard newBoard w h
+      where w = (width b)
+            h = (height b)
+            oldBoard = val b
+            newBoard = [[if (i, j) == (x, y) then a else ((oldBoard !! i) !! j) | j <- [0..(h-1)]] | i <- [0..(w-1)]]
 
   -- click on a cell
   -- if masked -> click
@@ -84,7 +78,7 @@ instance Board MyBoard Cell where
   -- if clicked and 0 adjacent mines -> click on all adjacent cells
   click (x, y) b
     | nbOfAdjacentMines /= 0 = newBoard
-    | otherwise = Prelude.foldr (\x acc -> if (get x acc) == (Masked False) then click x acc else acc) newBoard neighboursIndex
+    | otherwise = foldr (\x acc -> if (get x acc) == (Masked False) then click x acc else acc) newBoard neighboursIndex
       where nbOfAdjacentMines = length $ filter (\c -> c == (Masked True) || c == (Flagged True) || c == (Clicked (-1))) neighbours
             newBoard = set (x, y) (newValue oldValue) b
             neighboursIndex = [(i, j) | i <- [(x-1)..(x+1)], j <- [(y-1)..(y+1)], i >= 0, i < w, j >= 0, j < h, (i, j) /= (x, y)]
@@ -108,17 +102,17 @@ instance Board MyBoard Cell where
 
   -- check if game is won
   -- game is won if each flagged cell is a mine and each clicked cell is not a mine and there are no masked cell
-  won b = Fold.foldr wonCell True $ val b
+  won b = foldr wonCell True $ (concat $ val b)
     where wonCell (Flagged m) acc = acc && m == True
           wonCell (Masked _) _ = False
           wonCell (Clicked x) acc = acc && x >= 0
 
   -- check if game is lost
   -- game is lost if a clicked cell is a mine
-  lost b = Fold.foldr lostCell False $ val b
+  lost b = foldr lostCell False $ (concat $ val b)
     where lostCell (Flagged _) acc = acc || False
           lostCell (Masked _) acc = acc || False
           lostCell (Clicked a) acc  = acc || (a == -1)
 
   -- click on every cell to show the entire board at the end of game
-  reveal b = Prelude.foldr click b [(i, j) | i <- [0..(width b)], j <- [0..(height b)]]
+  reveal b = foldr click b [(i, j) | i <- [0..(width b)], j <- [0..(height b)]]
