@@ -27,23 +27,24 @@ launch = do
 
 myBoardToTable :: MyBoard -> IO Table
 myBoardToTable board = do
-	cellsToTable (val board) table
+	cellsToTable 0 (val board) table
 	where table = tableNew (width board) (height board) True
 
-cellsToTable :: [[Cell]] -> IO Table -> IO Table
-cellsToTable [] table = table
-cellsToTable (xs:xss) table = do
-	cellsToTable xss newTable
-	where newTable = cellsToRow (length xss) xs table
+
+cellsToTable :: Int -> [[Cell]] -> IO Table -> IO Table
+cellsToTable _ [] table = table
+cellsToTable i (xs:xss) table = do
+	cellsToTable (i+1) xss newTable
+	where newTable = cellsToRow (i, 0) xs table
 
 
-cellsToRow :: Int -> [Cell] -> IO Table -> IO Table
+cellsToRow :: (Int, Int) -> [Cell] -> IO Table -> IO Table
 cellsToRow _ [] table = table
-cellsToRow n (x:xs) table = do
+cellsToRow (i, j) (x:xs) table = do
 	button <- cellToButton x
-	tableOutIO <- table
-	tableAttachDefaults tableOutIO button (length xs) ((length xs)+1) n (n+1)
-	cellsToRow n xs (return tableOutIO)
+	tableOutIO <- cellsToRow (i, (j+1)) xs table
+	tableAttachDefaults tableOutIO button i (i+1) j (j+1)
+	return tableOutIO
 
 
 cellToButton :: Cell -> IO Button
