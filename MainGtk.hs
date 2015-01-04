@@ -6,8 +6,9 @@ import Board
 import MyBoard
 import Graphics.UI.Gtk as GTK
 import Graphics.UI.Gtk.ModelView as Model
-import Control.Monad.Trans.State as State
+import Control.Monad.Trans.State as StateT
 import Control.Monad.Trans
+import Control.Monad.State.Lazy as State
 
 main :: IO ()
 main = do 
@@ -18,32 +19,31 @@ main = do
 launch :: StateT MyBoard IO ()
 launch = do
 	window <- liftIO $ windowNew
-	board <- State.get
-	table <- liftIO $ myBoardToTable board
+	table <- myBoardToTable
 	liftIO $ GTK.set window [ containerBorderWidth := 10, containerChild := table ]
 	liftIO $ onDestroy window mainQuit
 	liftIO $ widgetShowAll window
 	return ()
 
-myBoardToTable :: MyBoard -> IO Table
-myBoardToTable board = do
-	cellsToTable 0 (val board) table
-	where table = tableNew (width board) (height board) True
+myBoardToTable :: StateT MyBoard IO Table
+myBoardToTable = do
+	board <- State.get
+	table <- liftIO $ tableNew (width board) (height board) True
+	cellsToTable 0 (val board) table 
 
 
-cellsToTable :: Int -> [[Cell]] -> IO Table -> IO Table
-cellsToTable _ [] table = table
+cellsToTable :: Int -> [[Cell]] -> Table -> StateT MyBoard IO Table
+cellsToTable _ [] table = return table
 cellsToTable i (xs:xss) table = do
+	newTable <- cellsToRow (i, 0) xs table
 	cellsToTable (i+1) xss newTable
-	where newTable = cellsToRow (i, 0) xs table
 
-
-cellsToRow :: (Int, Int) -> [Cell] -> IO Table -> IO Table
-cellsToRow _ [] table = table
+cellsToRow :: (Int, Int) -> [Cell] -> Table -> StateT MyBoard IO Table
+cellsToRow _ [] table = return table
 cellsToRow (i, j) (x:xs) table = do
-	button <- cellToButton x
+	button <- liftIO $ cellToButton x
 	tableOutIO <- cellsToRow (i, (j+1)) xs table
-	tableAttachDefaults tableOutIO button i (i+1) j (j+1)
+	liftIO $ tableAttachDefaults tableOutIO button i (i+1) j (j+1)
 	return tableOutIO
 
 
@@ -64,3 +64,7 @@ cellToButton (Clicked (-1)) = do
 	containerAdd button image
 	return button
 cellToButton (Clicked x) = buttonNewWithLabel (show x)
+
+onClickedCell :: (Int, Int) -> StateT MyBoard IO () -> IO ()
+onClickedCell position state = do
+	return ()
