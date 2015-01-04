@@ -10,41 +10,59 @@ import Control.Monad.Trans.State as StateT
 import Control.Monad.Trans
 import Control.Monad.State.Lazy as State
 
+data GUIState = GUIState {
+	board :: MyBoard,
+	window :: Window,
+	table :: Table
+}
+
+setBoard :: MyBoard -> GUIState -> GUIState
+setBoard newBoard guiState = GUIState newBoard (window guiState) (table guiState)
+
+setTable :: Table -> GUIState -> GUIState
+setTable newTable guiState = GUIState (board guiState) (window guiState) newTable
+
 main :: IO ()
 main = do 
 	initGUI
-	runStateT launch (initialize 54 (5,5) (0,0)) >> return ()
+	window <- windowNew
+	table <- tableNew 5 5 True
+	runStateT launch (GUIState board window table) >> return ()
 	mainGUI
+	where board = initialize 54 (5,5) (0,0)
 
-launch :: StateT MyBoard IO ()
+launch :: StateT GUIState IO ()
 launch = do
-	window <- liftIO $ windowNew
-	table <- myBoardToTable
-	liftIO $ GTK.set window [ containerBorderWidth := 10, containerChild := table ]
-	liftIO $ onDestroy window mainQuit
-	liftIO $ widgetShowAll window
+	newTable <- myBoardToTable
+	gui <- StateT.get
+	StateT.put $ setTable newTable gui
+	liftIO $ GTK.set (window gui) [ containerBorderWidth := 10, containerChild := newTable ]
+	liftIO $ onDestroy (window gui) mainQuit
+	liftIO $ widgetShowAll (window gui)
 	return ()
 
-myBoardToTable :: StateT MyBoard IO Table
+myBoardToTable :: StateT GUIState IO Table
 myBoardToTable = do
-	board <- State.get
-	table <- liftIO $ tableNew (width board) (height board) True
-	cellsToTable 0 (val board) table 
+	guiState <- StateT.get
+	let b = board guiState
+	table <- liftIO $ tableNew (width b) (height b) True
+	cellsToTable 0 (val b) table
 
 
-cellsToTable :: Int -> [[Cell]] -> Table -> StateT MyBoard IO Table
+cellsToTable :: Int -> [[Cell]] -> Table -> StateT GUIState IO Table
 cellsToTable _ [] table = return table
 cellsToTable i (xs:xss) table = do
 	newTable <- cellsToRow (i, 0) xs table
 	cellsToTable (i+1) xss newTable
 
-cellsToRow :: (Int, Int) -> [Cell] -> Table -> StateT MyBoard IO Table
+cellsToRow :: (Int, Int) -> [Cell] -> Table -> StateT GUIState IO Table
 cellsToRow _ [] table = return table
 cellsToRow (i, j) (x:xs) table = do
 	button <- liftIO $ cellToButton x
 	tableOutIO <- cellsToRow (i, (j+1)) xs table
-	board <- State.get
-	liftIO $ onClicked button $ onClickedCell (i, j) board
+	guiState <- State.get
+	let b = board guiState
+	liftIO $ onClicked button $ onClickedCell (i, j) b
 	liftIO $ tableAttachDefaults tableOutIO button i (i+1) j (j+1)
 	return tableOutIO
 
@@ -71,7 +89,6 @@ onClickedCell :: (Int, Int) -> MyBoard -> IO ()
 onClickedCell position board = do
 	(x, y) <- runStateT (changeState (click position)) board
 	return x
-	putStrLn $ show y
 
 changeState :: (MyBoard -> MyBoard) -> StateT MyBoard IO ()
 changeState f = do
