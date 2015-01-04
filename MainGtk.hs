@@ -43,6 +43,8 @@ cellsToRow _ [] table = return table
 cellsToRow (i, j) (x:xs) table = do
 	button <- liftIO $ cellToButton x
 	tableOutIO <- cellsToRow (i, (j+1)) xs table
+	board <- State.get
+	liftIO $ onClicked button $ onClickedCell (i, j) board
 	liftIO $ tableAttachDefaults tableOutIO button i (i+1) j (j+1)
 	return tableOutIO
 
@@ -65,6 +67,13 @@ cellToButton (Clicked (-1)) = do
 	return button
 cellToButton (Clicked x) = buttonNewWithLabel (show x)
 
-onClickedCell :: (Int, Int) -> StateT MyBoard IO () -> IO ()
-onClickedCell position state = do
-	return ()
+onClickedCell :: (Int, Int) -> MyBoard -> IO ()
+onClickedCell position board = do
+	(x, y) <- runStateT (changeState (click position)) board
+	return x
+	putStrLn $ show y
+
+changeState :: (MyBoard -> MyBoard) -> StateT MyBoard IO ()
+changeState f = do
+	StateT.modify f
+	fmap (\b -> ()) State.get
