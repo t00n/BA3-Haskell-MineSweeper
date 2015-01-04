@@ -64,17 +64,3 @@ cellToButton (Clicked (-1)) = do
 	containerAdd button image
 	return button
 cellToButton (Clicked x) = buttonNewWithLabel (show x)
-
-createBoard :: StateT MyBoard IO Table
-createBoard = do
-	board <- State.get
-	table <- liftIO $ tableNew (width board) (height board) True
-	createCells table ((width board)*(height board))
-
-createCells :: Table -> Int -> StateT MyBoard IO Table
-createCells table 0 = return table
-createCells table n = do
-	board <- State.get
-	button <- liftIO $ buttonNew
-	liftIO $ tableAttach table button ((n `mod` (width board))-1) ((n `mod` (width board))) ((n `div` (width board))-1) (n `div` (width board)) [] [] 0 0
-	createCells table (n-1)
