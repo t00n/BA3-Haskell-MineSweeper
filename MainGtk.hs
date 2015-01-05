@@ -13,28 +13,28 @@ import Board
 import MyBoard
 
 main :: IO ()
-main = do 
+main = do
 	initGUI
-	let b = initialize 54 (5,5) (0,0)
+	let b = initialize 54 (10,10) (0,0)
 	guiState <- newGUIState b
 	runStateT runGUI guiState -- >> return ()
 	mainGUI
 
 runGUI :: StateT GUIState IO ()
 runGUI = do
-	guiState <- StateT.get
 	refreshTable
+	guiState <- StateT.get
 	liftIO $ onDestroy (window guiState) mainQuit
 	return ()
 
 refreshTable :: StateT GUIState IO ()
 refreshTable = do
 	guiState <- StateT.get
-	let oldTable = table guiState
+	let t = table guiState
 	let w = window guiState
 	newTable <- myBoardToTable
 	StateT.modify $ setTable newTable
-	liftIO $ widgetDestroy oldTable
+	liftIO $ widgetDestroy t
 	liftIO $ GTK.set w [ containerBorderWidth := 10, containerChild := newTable ]
 	liftIO $ widgetShowAll w
 
@@ -56,11 +56,16 @@ cellsToTable i (xs:xss) table = do
 cellsToRow :: (Int, Int) -> [Cell] -> Table -> StateT GUIState IO Table
 cellsToRow _ [] table = return table
 cellsToRow (i, j) (x:xs) table = do
-	button <- liftIO $ cellToButton x
 	tableOutIO <- cellsToRow (i, (j+1)) xs table
 	guiState <- State.get
-	StateT.put $ setTable tableOutIO guiState
-	liftIO $ onClicked button $ onClickedCell (click (i, j)) guiState
+	StateT.modify $ setTable tableOutIO
+	button <- liftIO $ cellToButton x
+	liftIO $ button `on` buttonPressEvent $ tryEvent $ do
+		LeftButton <- eventButton
+		liftIO $ onClickedCell (click (i, j)) guiState
+	liftIO $ button `on` buttonPressEvent $ tryEvent $ do
+		RightButton <- eventButton
+		liftIO $ onClickedCell (flag (i, j)) guiState
 	liftIO $ tableAttachDefaults tableOutIO button i (i+1) j (j+1)
 	return tableOutIO
 
