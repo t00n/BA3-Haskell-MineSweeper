@@ -15,10 +15,10 @@ import MyBoard
 main :: IO ()
 main = do 
 	initGUI
-	guiState <- newGUIState board
-	runStateT runGUI guiState >> return ()
+	let b = initialize 54 (5,5) (0,0)
+	guiState <- newGUIState b
+	runStateT runGUI guiState -- >> return ()
 	mainGUI
-	where board = initialize 54 (5,5) (0,0)
 
 runGUI :: StateT GUIState IO ()
 runGUI = do
@@ -33,7 +33,7 @@ refreshTable = do
 	let oldTable = table guiState
 	let w = window guiState
 	newTable <- myBoardToTable
-	StateT.put $ setTable newTable guiState
+	StateT.modify $ setTable newTable
 	liftIO $ widgetDestroy oldTable
 	liftIO $ GTK.set w [ containerBorderWidth := 10, containerChild := newTable ]
 	liftIO $ widgetShowAll w
@@ -60,7 +60,7 @@ cellsToRow (i, j) (x:xs) table = do
 	tableOutIO <- cellsToRow (i, (j+1)) xs table
 	guiState <- State.get
 	StateT.put $ setTable tableOutIO guiState
-	liftIO $ onClicked button $ onClickedCell click (i, j) guiState
+	liftIO $ onClicked button $ onClickedCell (click (i, j)) guiState
 	liftIO $ tableAttachDefaults tableOutIO button i (i+1) j (j+1)
 	return tableOutIO
 
@@ -85,17 +85,17 @@ cellToButton (Clicked x) = buttonNewWithLabel (show x)
 
 -- cell clicked event
 -- because it is in the IO monad, it must get the state as a parameter to modify it
-onClickedCell :: ((Int, Int) -> MyBoard -> MyBoard) -> (Int, Int) -> GUIState -> IO ()
-onClickedCell f position guiState = do
-	(x, y) <- runStateT (updateTable f position) guiState
+onClickedCell :: (MyBoard -> MyBoard) -> GUIState -> IO ()
+onClickedCell f guiState = do
+	(x, y) <- runStateT (updateTable f) guiState
 	return x
 
 -- called from onClickedCell to return in StateT monad and modify the state
-updateTable :: ((Int, Int) -> MyBoard -> MyBoard) -> (Int, Int) -> StateT GUIState IO ()
-updateTable f (i,j) = do
+updateTable :: (MyBoard -> MyBoard) -> StateT GUIState IO ()
+updateTable f = do
 	guiState <- StateT.get
 	let b = board guiState
-	let newBoard = f (i,j) b
-	StateT.put (setBoard newBoard guiState)
+	let newBoard = f b
+	StateT.modify $ setBoard newBoard
 	refreshTable
 	fmap (\b -> ()) StateT.get
