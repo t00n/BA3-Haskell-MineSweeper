@@ -2,8 +2,6 @@
 
 module Main (main) where
 
-import Board
-import MyBoard
 import Graphics.UI.Gtk as GTK
 import Graphics.UI.Gtk.ModelView as Model
 import Control.Monad.Trans.State as StateT
@@ -11,17 +9,19 @@ import Control.Monad.Trans
 import Control.Monad.State.Lazy as State
 
 import GUIState
+import Board
+import MyBoard
 
 main :: IO ()
 main = do 
 	initGUI
 	guiState <- newGUIState board
-	runStateT runWindow guiState >> return ()
+	runStateT runGUI guiState >> return ()
 	mainGUI
 	where board = initialize 54 (5,5) (0,0)
 
-runWindow :: StateT GUIState IO ()
-runWindow = do
+runGUI :: StateT GUIState IO ()
+runGUI = do
 	guiState <- StateT.get
 	refreshTable
 	liftIO $ onDestroy (window guiState) mainQuit
@@ -29,11 +29,14 @@ runWindow = do
 
 refreshTable :: StateT GUIState IO ()
 refreshTable = do
-	newTable <- myBoardToTable
 	guiState <- StateT.get
+	let oldTable = table guiState
+	let w = window guiState
+	newTable <- myBoardToTable
 	StateT.put $ setTable newTable guiState
-	liftIO $ GTK.set (window guiState) [ containerBorderWidth := 10, containerChild := newTable ]
-	liftIO $ widgetShowAll (window guiState)
+	liftIO $ widgetDestroy oldTable
+	liftIO $ GTK.set w [ containerBorderWidth := 10, containerChild := newTable ]
+	liftIO $ widgetShowAll w
 
 
 myBoardToTable :: StateT GUIState IO Table
@@ -57,7 +60,7 @@ cellsToRow (i, j) (x:xs) table = do
 	tableOutIO <- cellsToRow (i, (j+1)) xs table
 	guiState <- State.get
 	StateT.put $ setTable tableOutIO guiState
-	liftIO $ onClicked button $ onClickedCell (i, j) guiState
+	liftIO $ onClicked button $ onClickedCell click (i, j) guiState
 	liftIO $ tableAttachDefaults tableOutIO button i (i+1) j (j+1)
 	return tableOutIO
 
@@ -80,24 +83,19 @@ cellToButton (Clicked (-1)) = do
 	return button
 cellToButton (Clicked x) = buttonNewWithLabel (show x)
 
-onClickedCell :: (Int, Int) -> GUIState -> IO ()
-onClickedCell position guiState = do
-	(x, y) <- runStateT (changeState position click) guiState
+-- cell clicked event
+-- because it is in the IO monad, it must get the state as a parameter to modify it
+onClickedCell :: ((Int, Int) -> MyBoard -> MyBoard) -> (Int, Int) -> GUIState -> IO ()
+onClickedCell f position guiState = do
+	(x, y) <- runStateT (updateTable f position) guiState
 	return x
-	putStrLn $ show (board y)
 
-changeState :: (Int, Int) -> ((Int, Int) -> MyBoard -> MyBoard) -> StateT GUIState IO ()
-changeState (i,j) f = do
+-- called from onClickedCell to return in StateT monad and modify the state
+updateTable :: ((Int, Int) -> MyBoard -> MyBoard) -> (Int, Int) -> StateT GUIState IO ()
+updateTable f (i,j) = do
 	guiState <- StateT.get
 	let b = board guiState
 	let newBoard = f (i,j) b
 	StateT.put (setBoard newBoard guiState)
-	let tableOutIO = table guiState
-	let w = window guiState
-	liftIO $ widgetDestroy tableOutIO
-	liftIO $ putStrLn (show b)
-	newTable <- myBoardToTable
-	liftIO $ GTK.set w [ containerBorderWidth := 10, containerChild := newTable ]
-	liftIO $ widgetShowAll w
-	State.put (setTable tableOutIO guiState)
+	refreshTable
 	fmap (\b -> ()) StateT.get
