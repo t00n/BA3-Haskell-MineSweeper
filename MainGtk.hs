@@ -10,36 +10,31 @@ import Control.Monad.Trans.State as StateT
 import Control.Monad.Trans
 import Control.Monad.State.Lazy as State
 
-data GUIState = GUIState {
-	board :: MyBoard,
-	window :: Window,
-	table :: Table
-}
-
-setBoard :: MyBoard -> GUIState -> GUIState
-setBoard newBoard guiState = GUIState newBoard (window guiState) (table guiState)
-
-setTable :: Table -> GUIState -> GUIState
-setTable newTable guiState = GUIState (board guiState) (window guiState) newTable
+import GUIState
 
 main :: IO ()
 main = do 
 	initGUI
-	window <- windowNew
-	table <- tableNew 5 5 True
-	runStateT launch (GUIState board window table) >> return ()
+	guiState <- newGUIState board
+	runStateT runWindow guiState >> return ()
 	mainGUI
 	where board = initialize 54 (5,5) (0,0)
 
-launch :: StateT GUIState IO ()
-launch = do
-	newTable <- myBoardToTable
-	gui <- StateT.get
-	StateT.put $ setTable newTable gui
-	liftIO $ GTK.set (window gui) [ containerBorderWidth := 10, containerChild := newTable ]
-	liftIO $ onDestroy (window gui) mainQuit
-	liftIO $ widgetShowAll (window gui)
+runWindow :: StateT GUIState IO ()
+runWindow = do
+	guiState <- StateT.get
+	refreshTable
+	liftIO $ onDestroy (window guiState) mainQuit
 	return ()
+
+refreshTable :: StateT GUIState IO ()
+refreshTable = do
+	newTable <- myBoardToTable
+	guiState <- StateT.get
+	StateT.put $ setTable newTable guiState
+	liftIO $ GTK.set (window guiState) [ containerBorderWidth := 10, containerChild := newTable ]
+	liftIO $ widgetShowAll (window guiState)
+
 
 myBoardToTable :: StateT GUIState IO Table
 myBoardToTable = do
