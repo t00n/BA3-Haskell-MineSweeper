@@ -61,8 +61,8 @@ cellsToRow (i, j) (x:xs) table = do
 	button <- liftIO $ cellToButton x
 	tableOutIO <- cellsToRow (i, (j+1)) xs table
 	guiState <- State.get
-	let b = board guiState
-	liftIO $ onClicked button $ onClickedCell (i, j) b
+	StateT.put $ setTable tableOutIO guiState
+	liftIO $ onClicked button $ onClickedCell (i, j) guiState
 	liftIO $ tableAttachDefaults tableOutIO button i (i+1) j (j+1)
 	return tableOutIO
 
@@ -85,12 +85,24 @@ cellToButton (Clicked (-1)) = do
 	return button
 cellToButton (Clicked x) = buttonNewWithLabel (show x)
 
-onClickedCell :: (Int, Int) -> MyBoard -> IO ()
-onClickedCell position board = do
-	(x, y) <- runStateT (changeState (click position)) board
+onClickedCell :: (Int, Int) -> GUIState -> IO ()
+onClickedCell position guiState = do
+	(x, y) <- runStateT (changeState position click) guiState
 	return x
+	putStrLn $ show (board y)
 
-changeState :: (MyBoard -> MyBoard) -> StateT MyBoard IO ()
-changeState f = do
-	StateT.modify f
-	fmap (\b -> ()) State.get
+changeState :: (Int, Int) -> ((Int, Int) -> MyBoard -> MyBoard) -> StateT GUIState IO ()
+changeState (i,j) f = do
+	guiState <- StateT.get
+	let b = board guiState
+	let newBoard = f (i,j) b
+	StateT.put (setBoard newBoard guiState)
+	let tableOutIO = table guiState
+	let w = window guiState
+	liftIO $ widgetDestroy tableOutIO
+	liftIO $ putStrLn (show b)
+	newTable <- myBoardToTable
+	liftIO $ GTK.set w [ containerBorderWidth := 10, containerChild := newTable ]
+	liftIO $ widgetShowAll w
+	State.put (setTable tableOutIO guiState)
+	fmap (\b -> ()) StateT.get
