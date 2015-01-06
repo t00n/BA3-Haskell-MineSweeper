@@ -15,7 +15,7 @@ import MyBoard
 main :: IO ()
 main = do
 	initGUI
-	let b = initialize 54 (10,10) (0,0)
+	let b = initialize 54 (5,5) (0,0)
 	guiState <- newGUIState b
 	runStateT runGUI guiState -- >> return ()
 	mainGUI
@@ -50,15 +50,15 @@ myBoardToTable = do
 cellsToTable :: Int -> [[Cell]] -> Table -> StateT GUIState IO Table
 cellsToTable _ [] table = return table
 cellsToTable i (xs:xss) table = do
-	newTable <- cellsToRow (i, 0) xs table
-	cellsToTable (i+1) xss newTable
+	newTable <- cellsToTable (i+1) xss table
+	cellsToRow (i, 0) xs newTable
 
 cellsToRow :: (Int, Int) -> [Cell] -> Table -> StateT GUIState IO Table
 cellsToRow _ [] table = return table
 cellsToRow (i, j) (x:xs) table = do
 	tableOutIO <- cellsToRow (i, (j+1)) xs table
-	guiState <- State.get
 	StateT.modify $ setTable tableOutIO
+	guiState <- State.get
 	button <- liftIO $ cellToButton x
 	liftIO $ button `on` buttonPressEvent $ tryEvent $ do
 		LeftButton <- eventButton
