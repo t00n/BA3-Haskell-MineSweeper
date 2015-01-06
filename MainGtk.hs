@@ -62,10 +62,10 @@ cellsToRow (i, j) (x:xs) table = do
 	button <- liftIO $ cellToButton x
 	liftIO $ button `on` buttonPressEvent $ tryEvent $ do
 		LeftButton <- eventButton
-		liftIO $ onClickedCell (click (i, j)) guiState
+		liftIO $ onClickedCell (click (i, j) (board guiState)) guiState
 	liftIO $ button `on` buttonPressEvent $ tryEvent $ do
 		RightButton <- eventButton
-		liftIO $ onClickedCell (flag (i, j)) guiState
+		liftIO $ onClickedCell (flag (i, j) (board guiState)) guiState
 	liftIO $ tableAttachDefaults tableOutIO button i (i+1) j (j+1)
 	return tableOutIO
 
@@ -90,17 +90,15 @@ cellToButton (Clicked x) = buttonNewWithLabel (show x)
 
 -- cell clicked event
 -- because it is in the IO monad, it must get the state as a parameter to modify it
-onClickedCell :: (MyBoard -> MyBoard) -> GUIState -> IO ()
-onClickedCell f guiState = do
-	(x, y) <- runStateT (updateTable f) guiState
+onClickedCell :: MyBoard -> GUIState -> IO ()
+onClickedCell b guiState = do
+	(x, y) <- runStateT (updateTable b) guiState
 	return x
 
 -- called from onClickedCell to return in StateT monad and modify the state
-updateTable :: (MyBoard -> MyBoard) -> StateT GUIState IO ()
-updateTable f = do
-	guiState <- StateT.get
-	let b = board guiState
-	let newBoard = f b
-	StateT.modify $ setBoard newBoard
+updateTable :: MyBoard -> StateT GUIState IO ()
+updateTable b = do
+	StateT.modify $ setBoard b
 	refreshTable
+	guiState <- StateT.get
 	fmap (\b -> ()) StateT.get
