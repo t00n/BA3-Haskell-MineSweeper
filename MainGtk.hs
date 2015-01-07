@@ -15,10 +15,43 @@ import MyBoard
 main :: IO ()
 main = do
 	initGUI
-	let b = initialize 54 (5,5) (0,0)
-	guiState <- newGUIState b
-	runStateT runGUI guiState -- >> return ()
+	initWindowNew
 	mainGUI
+
+initWindowNew :: IO ()
+initWindowNew = do
+	-- init
+	w <- windowNew
+	vbox <- vBoxNew False 0
+	labelSeed <- labelNew $ Just "Seed"
+	entrySeed <- entryNew
+	labelSize <- labelNew $ Just "Size"
+	entrySize <- entryNew
+	labelClick <- labelNew $ Just "First click"
+	entryClick <- entryNew
+	buttonOk <- buttonNewWithLabel "New"
+	-- event callback
+	onClicked buttonOk $ do
+		seed <- entryGetText entrySeed :: IO [Char]
+		size <- entryGetText entrySize :: IO [Char]
+		click <- entryGetText entryClick :: IO [Char]
+		guiState <- newGUIState $ initialize (read seed) (read size) (read click)
+		runStateT runGUI guiState
+		widgetHide w
+		return ()
+	-- put objects in container
+	containerAdd vbox labelSeed
+	containerAdd vbox entrySeed
+	containerAdd vbox labelSize
+	containerAdd vbox entrySize
+	containerAdd vbox labelClick
+	containerAdd vbox entryClick
+	containerAdd vbox buttonOk
+	-- window
+	GTK.set w [containerChild := vbox ]
+	onDestroy w mainQuit
+	widgetShowAll w
+	return ()
 
 runGUI :: StateT GUIState IO ()
 runGUI = do
@@ -69,7 +102,7 @@ cellsToRow (i, j) (x:xs) table = do
 	liftIO $ tableAttachDefaults tableOutIO button i (i+1) j (j+1)
 	return tableOutIO
 
-
+-- create a gtk button from a cell
 cellToButton :: Cell -> IO Button
 cellToButton (Masked _) = do
 	button <- buttonNew
@@ -89,7 +122,8 @@ cellToButton (Clicked (-1)) = do
 cellToButton (Clicked x) = buttonNewWithLabel (show x)
 
 -- cell clicked event
--- because it is in the IO monad, it must get the state as a parameter to modify it
+-- parameter 1 : the new board if this cell is clicked/flagged
+-- parameter 2 : because it is in the IO monad, it must get the state as a parameter to modify it
 onClickedCell :: MyBoard -> GUIState -> IO ()
 onClickedCell b guiState = do
 	(x, y) <- runStateT (updateTable b) guiState
