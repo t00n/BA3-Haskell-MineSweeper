@@ -53,6 +53,61 @@ showOptionsWindow ref = do
 	widgetShowAll (optionsWindow ps)
 	widgetHide (mainWindow ps)
 
+-------- menu GUI methods
+resetTable :: IORef ProgramState -> IO ()
+resetTable ref = do
+	ps <- readIORef ref
+	let opt = options ps
+	writeIORef ref $ ProgramState (mainWindow ps) (optionsWindow ps) (initialize (seed opt) (size opt) (firstClick opt)) (buttons ps) opt
+	updateTable ref
+
+-------- update GUI methods --------
+updateTable :: IORef ProgramState -> IO ()
+updateTable ref = do
+	ps <- readIORef ref
+	let buttonTable = buttons ps
+	let b = val $ board ps
+	updateRow 0 b buttonTable
+	putStrLn $ show $ board ps
+
+updateRow :: Int -> [[Cell]] -> [[Button]] -> IO ()
+updateRow _ [] _ = return ()
+updateRow i (xs:xss) buttonTable = do
+	updateRow (i+1) xss buttonTable
+	updateCell (i, 0) xs buttonTable
+
+updateCell :: (Int, Int) -> [Cell] -> [[Button]] -> IO ()
+updateCell _ [] _ = return ()
+updateCell (i,j) (x:xs) buttonTable = do
+	updateCell (i, (j+1)) xs buttonTable
+	cellToButton x ((buttonTable!!i)!!j)
+
+cellToButton :: Cell -> Button -> IO ()
+cellToButton (Masked _) button = do
+	emptyButton button
+	image <- imageNewFromFile "masked.png"
+	buttonSetImage button image
+	buttonSetLabel button ""
+cellToButton (Flagged _) button = do
+	emptyButton button
+	image <- imageNewFromFile "flag.png"
+	buttonSetImage button image
+	buttonSetLabel button ""
+cellToButton (Clicked (-1)) button = do
+	emptyButton button
+	image <- imageNewFromFile "mine.png"
+	buttonSetImage button image
+	buttonSetLabel button ""
+cellToButton (Clicked x) button = do
+	emptyButton button
+	buttonSetLabel button (show x)
+
+emptyButton :: Button -> IO ()
+emptyButton button = do
+	children <- containerGetChildren button
+	containerForeach button (containerRemove button)
+
+-------- build GUI methods --------
 buildMainWindow :: IORef ProgramState -> IO Window
 buildMainWindow ref = do
 	ps <- readIORef ref
@@ -136,47 +191,3 @@ cellsToRow (i, j) (x:xs) table ref = do
 	let newButtonList = button : buttonList
 	tableAttachDefaults table button i (i+1) j (j+1)
 	return newButtonList
-
-updateTable :: IORef ProgramState -> IO ()
-updateTable ref = do
-	ps <- readIORef ref
-	let buttonTable = buttons ps
-	let b = val $ board ps
-	updateRow 0 b buttonTable
-	putStrLn $ show $ board ps
-
-updateRow :: Int -> [[Cell]] -> [[Button]] -> IO ()
-updateRow _ [] _ = return ()
-updateRow i (xs:xss) buttonTable = do
-	updateRow (i+1) xss buttonTable
-	updateCell (i, 0) xs buttonTable
-
-updateCell :: (Int, Int) -> [Cell] -> [[Button]] -> IO ()
-updateCell _ [] _ = return ()
-updateCell (i,j) (x:xs) buttonTable = do
-	updateCell (i, (j+1)) xs buttonTable
-	cellToButton x ((buttonTable!!i)!!j)
-
-
--- create a gtk button from a cell
-cellToButton :: Cell -> Button -> IO ()
-cellToButton (Masked _) button = do
-	emptyButton button
-	image <- imageNewFromFile "masked.png"
-	buttonSetImage button image
-cellToButton (Flagged _) button = do
-	emptyButton button
-	image <- imageNewFromFile "flag.png"
-	buttonSetImage button image
-cellToButton (Clicked (-1)) button = do
-	emptyButton button
-	image <- imageNewFromFile "mine.png"
-	buttonSetImage button image
-cellToButton (Clicked x) button = do
-	emptyButton button
-	buttonSetLabel button (show x)
-
-emptyButton :: Button -> IO ()
-emptyButton button = do
-	children <- containerGetChildren button
-	containerForeach button (containerRemove button)
