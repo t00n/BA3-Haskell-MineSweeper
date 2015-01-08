@@ -142,8 +142,8 @@ updateTable ref = do
 	ps <- readIORef ref
 	let buttonTable = buttons ps
 	let b = val $ board ps
-	putStrLn $ show $ board ps
 	updateRow 0 b buttonTable
+	putStrLn $ show $ board ps
 
 updateRow :: Int -> [[Cell]] -> [[Button]] -> IO ()
 updateRow _ [] _ = return ()
@@ -161,15 +161,22 @@ updateCell (i,j) (x:xs) buttonTable = do
 -- create a gtk button from a cell
 cellToButton :: Cell -> Button -> IO ()
 cellToButton (Masked _) button = do
+	emptyButton button
 	image <- imageNewFromFile "masked.png"
 	buttonSetImage button image
 cellToButton (Flagged _) button = do
-	button <- buttonNew
+	emptyButton button
 	image <- imageNewFromFile "flag.png"
 	buttonSetImage button image
 cellToButton (Clicked (-1)) button = do
-	button <- buttonNew
+	emptyButton button
 	image <- imageNewFromFile "mine.png"
 	buttonSetImage button image
 cellToButton (Clicked x) button = do
+	emptyButton button
 	buttonSetLabel button (show x)
+
+emptyButton :: Button -> IO ()
+emptyButton button = do
+	children <- containerGetChildren button
+	containerForeach button (containerRemove button)
