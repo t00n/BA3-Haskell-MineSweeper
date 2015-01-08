@@ -184,20 +184,17 @@ cellsToRow _ [] _ _ = return []
 cellsToRow (i, j) (x:xs) table ref = do
 	buttonList <- cellsToRow (i, (j+1)) xs table ref
 	button <- buttonNew
-	button `on` buttonPressEvent $ tryEvent $ do
-		LeftButton <- eventButton
-		ps <- liftIO $ readIORef ref
-		let newBoard = click (i, j) (board ps)
-		liftIO $ writeIORef ref $ setBoard newBoard ps
-		liftIO $ updateTable ref
-	button `on` buttonPressEvent $ tryEvent $ do
-		RightButton <- eventButton
-		ps <- liftIO $ readIORef ref
-		let newBoard = flag (i, j) (board ps)
-		liftIO $ writeIORef ref $ setBoard newBoard ps
-		liftIO $ updateTable ref
+	button `on` buttonPressEvent $ tryEvent $ onClickedCell (click (i,j)) ref
+	button `on` buttonPressEvent $ tryEvent $ onClickedCell (flag (i,j)) ref
 	let newButtonList = button : buttonList
 	tableAttachDefaults table button i (i+1) j (j+1)
 	return newButtonList
 
+onClickedCell :: (MyBoard -> MyBoard) -> IORef ProgramState -> EventM EButton ()
+onClickedCell callback ref = do
+	LeftButton <- eventButton
+	ps <- liftIO $ readIORef ref
+	let newBoard = callback (board ps)
+	liftIO $ writeIORef ref $ setBoard newBoard ps
+	liftIO $ updateTable ref
 
