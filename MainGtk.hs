@@ -31,6 +31,15 @@ dummyProgramState = do
 	let opt = Options 0 (0,0) (0,0)
 	return $ ProgramState mainW optionsW b [[]] opt
 
+setBoard :: MyBoard -> ProgramState -> ProgramState
+setBoard b ps = ProgramState (mainWindow ps) (optionsWindow ps) b (buttons ps) (options ps)
+
+setButtons :: [[Button]] -> ProgramState -> ProgramState
+setButtons b ps = ProgramState (mainWindow ps) (optionsWindow ps) (board ps) b (options ps)
+
+setOptions :: Options -> ProgramState -> ProgramState
+setOptions opt ps = ProgramState (mainWindow ps) (optionsWindow ps) (board ps) (buttons ps) opt
+
 main :: IO ()
 main = do
 	initGUI
@@ -58,7 +67,7 @@ resetTable :: IORef ProgramState -> IO ()
 resetTable ref = do
 	ps <- readIORef ref
 	let opt = options ps
-	writeIORef ref $ ProgramState (mainWindow ps) (optionsWindow ps) (initialize (seed opt) (size opt) (firstClick opt)) (buttons ps) opt
+	writeIORef ref $ setBoard (initialize (seed opt) (size opt) (firstClick opt)) ps
 	updateTable ref
 
 -------- update GUI methods --------
@@ -68,7 +77,6 @@ updateTable ref = do
 	let buttonTable = buttons ps
 	let b = val $ board ps
 	updateRow 0 b buttonTable
-	putStrLn $ show $ board ps
 
 updateRow :: Int -> [[Cell]] -> [[Button]] -> IO ()
 updateRow _ [] _ = return ()
@@ -135,7 +143,7 @@ buildOptionsWindow ref = do
 		click <- entryGetText entryClick :: IO [Char]
 		let opt = Options (read seed) (read size) (read click)
 		let b = initialize (read seed) (read size) (read click)
-		let newPS = ProgramState (mainWindow ps) (optionsWindow ps) b (buttons ps) opt
+		let newPS = setBoard b (setOptions opt ps)
 		writeIORef ref newPS
 		buildTable ref
 		showMainWindow ref
@@ -160,7 +168,7 @@ buildTable ref = do
 	let w = mainWindow ps
 	GTK.set w [ containerChild := table ]
 	buttonTable <- cellsToTable 0 (val b) table ref
-	writeIORef ref $ ProgramState w (optionsWindow ps) b buttonTable (options ps)
+	writeIORef ref $ setButtons buttonTable ps
 	updateTable ref
 
 cellsToTable :: Int -> [[Cell]] -> Table -> IORef ProgramState -> IO [[Button]]
@@ -180,14 +188,16 @@ cellsToRow (i, j) (x:xs) table ref = do
 		LeftButton <- eventButton
 		ps <- liftIO $ readIORef ref
 		let newBoard = click (i, j) (board ps)
-		liftIO $ writeIORef ref $ ProgramState (mainWindow ps) (optionsWindow ps) newBoard (buttons ps) (options ps)
+		liftIO $ writeIORef ref $ setBoard newBoard ps
 		liftIO $ updateTable ref
 	button `on` buttonPressEvent $ tryEvent $ do
 		RightButton <- eventButton
 		ps <- liftIO $ readIORef ref
 		let newBoard = flag (i, j) (board ps)
-		liftIO $ writeIORef ref $ ProgramState (mainWindow ps) (optionsWindow ps) newBoard (buttons ps) (options ps)
+		liftIO $ writeIORef ref $ setBoard newBoard ps
 		liftIO $ updateTable ref
 	let newButtonList = button : buttonList
 	tableAttachDefaults table button i (i+1) j (j+1)
 	return newButtonList
+
+
