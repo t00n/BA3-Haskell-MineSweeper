@@ -18,6 +18,7 @@ data Options = Options {
 data ProgramState = ProgramState {
 	mainWindow :: Window,
 	optionsWindow :: Window,
+	buttonSmiley :: Button,
 	board :: MyBoard,
 	buttons :: [[Button]],
 	options :: Options
@@ -27,18 +28,19 @@ dummyProgramState :: IO ProgramState
 dummyProgramState = do
 	mainW <- windowNew
 	optionsW <- windowNew
+	button <- buttonNew
 	let b = initialize 0 (0,0) (0,0)
 	let opt = Options 0 (0,0) (0,0)
-	return $ ProgramState mainW optionsW b [[]] opt
+	return $ ProgramState mainW optionsW button b [[]] opt
 
 setBoard :: MyBoard -> ProgramState -> ProgramState
-setBoard b ps = ProgramState (mainWindow ps) (optionsWindow ps) b (buttons ps) (options ps)
+setBoard b ps = ProgramState (mainWindow ps) (optionsWindow ps) (buttonSmiley ps) b (buttons ps) (options ps)
 
 setButtons :: [[Button]] -> ProgramState -> ProgramState
-setButtons b ps = ProgramState (mainWindow ps) (optionsWindow ps) (board ps) b (options ps)
+setButtons b ps = ProgramState (mainWindow ps) (optionsWindow ps) (buttonSmiley ps) (board ps) b (options ps)
 
 setOptions :: Options -> ProgramState -> ProgramState
-setOptions opt ps = ProgramState (mainWindow ps) (optionsWindow ps) (board ps) (buttons ps) opt
+setOptions opt ps = ProgramState (mainWindow ps) (optionsWindow ps) (buttonSmiley ps) (board ps) (buttons ps) opt
 
 main :: IO ()
 main = do
@@ -120,6 +122,15 @@ buildMainWindow :: IORef ProgramState -> IO Window
 buildMainWindow ref = do
 	ps <- readIORef ref
 	let w = mainWindow ps
+	-- button smiley
+	let buttonSmile = buttonSmiley ps
+	image <- imageNewFromFile "smiley_ingame.jpg"
+	buttonSetImage buttonSmile image
+	onClicked buttonSmile $ resetTable ref
+	-- vbox
+	vbox <- vBoxNew False 0
+	GTK.set w [ containerChild := vbox ]
+	containerAdd vbox buttonSmile
 	onDestroy w mainQuit
 	return w
 
@@ -166,7 +177,8 @@ buildTable ref = do
 	let b = board ps
 	table <- tableNew (width b) (height b) True
 	let w = mainWindow ps
-	GTK.set w [ containerChild := table ]
+	Just vbox <- binGetChild w
+	containerAdd (castToContainer vbox) table
 	buttonTable <- cellsToTable 0 (val b) table ref
 	writeIORef ref $ setButtons buttonTable ps
 	updateTable ref
@@ -186,8 +198,8 @@ cellsToRow (i, j) (x:xs) table ref = do
 	button <- buttonNew
 	button `on` buttonPressEvent $ tryEvent $ onClickedCell (click (i,j)) ref
 	button `on` buttonPressEvent $ tryEvent $ onClickedCell (flag (i,j)) ref
-	let newButtonList = button : buttonList
 	tableAttachDefaults table button i (i+1) j (j+1)
+	let newButtonList = button : buttonList
 	return newButtonList
 
 onClickedCell :: (MyBoard -> MyBoard) -> IORef ProgramState -> EventM EButton ()
