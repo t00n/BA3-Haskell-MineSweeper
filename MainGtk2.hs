@@ -4,6 +4,7 @@ module Main (main) where
 
 import Graphics.UI.Gtk as GTK
 import Data.IORef
+import Control.Monad.Trans
 
 import Board
 import MyBoard
@@ -59,54 +60,6 @@ buildMainWindow ref = do
 	onDestroy w mainQuit
 	return w
 
-buildTable :: IORef ProgramState -> IO ()
-buildTable ref = do
-	ps <-readIORef ref
-	let b = board ps
-	table <- tableNew (width b) (height b) True
-	cellsToTable 0 (val b) table
-	let w = mainWindow ps
-	GTK.set w [ containerChild := table ]
-
-cellsToTable :: Int -> [[Cell]] -> Table -> IO ()
-cellsToTable _ [] table = return ()
-cellsToTable i (xs:xss) table = do
-	cellsToTable (i+1) xss table
-	cellsToRow (i, 0) xs table
-
-cellsToRow :: (Int, Int) -> [Cell] -> Table -> IO ()
-cellsToRow _ [] table = return ()
-cellsToRow (i, j) (x:xs) table = do
-	cellsToRow (i, (j+1)) xs table
-	button <- buttonNew
-	tableAttachDefaults table button i (i+1) j (j+1)
-
-	--button `on` buttonPressEvent $ tryEvent $ do
-	--	LeftButton <- eventButton
-	--	onClickedCell (click (i, j) (board guiState)) guiState
-	--button `on` buttonPressEvent $ tryEvent $ do
-	--	RightButton <- eventButton
-	--	onClickedCell (flag (i, j) (board guiState)) guiState
-
--- create a gtk button from a cell
-cellToButton :: Cell -> IO Button
-cellToButton (Masked _) = do
-	button <- buttonNew
-	image <- imageNewFromFile "masked.png"
-	containerAdd button image
-	return button
-cellToButton (Flagged _) = do
-	button <- buttonNew
-	image <- imageNewFromFile "flag.png"
-	containerAdd button image
-	return button
-cellToButton (Clicked (-1)) = do
-	button <- buttonNew
-	image <- imageNewFromFile "mine.png"
-	containerAdd button image
-	return button
-cellToButton (Clicked x) = buttonNewWithLabel (show x)
-
 buildOptionsWindow :: IORef ProgramState -> IO Window
 buildOptionsWindow ref = do
 	-- init
@@ -125,8 +78,9 @@ buildOptionsWindow ref = do
 		seed <- entryGetText entrySeed :: IO [Char]
 		size <- entryGetText entrySize :: IO [Char]
 		click <- entryGetText entryClick :: IO [Char]
+		let opt = Options (read seed) (read size) (read click)
 		let b = initialize (read seed) (read size) (read click)
-		let newPS = ProgramState (mainWindow ps) (optionsWindow ps) b (buttons ps) (options ps)
+		let newPS = ProgramState (mainWindow ps) (optionsWindow ps) b (buttons ps) opt
 		writeIORef ref newPS
 		buildTable ref
 		showMainWindow ref
@@ -142,3 +96,80 @@ buildOptionsWindow ref = do
 	GTK.set w [containerChild := vbox ]
 	onDestroy w mainQuit
 	return w
+
+buildTable :: IORef ProgramState -> IO ()
+buildTable ref = do
+	ps <- readIORef ref
+	let b = board ps
+	table <- tableNew (width b) (height b) True
+	let w = mainWindow ps
+	GTK.set w [ containerChild := table ]
+	buttonTable <- cellsToTable 0 (val b) table ref
+	writeIORef ref $ ProgramState w (optionsWindow ps) b buttonTable (options ps)
+	updateTable ref
+
+cellsToTable :: Int -> [[Cell]] -> Table -> IORef ProgramState -> IO [[Button]]
+cellsToTable _ [] _ _ = return []
+cellsToTable i (xs:xss) table ref = do
+	buttonTable <- cellsToTable (i+1) xss table ref
+	buttonList <- cellsToRow (i, 0) xs table ref
+	let newButtonTable = buttonList : buttonTable
+	return newButtonTable
+
+cellsToRow :: (Int, Int) -> [Cell] -> Table -> IORef ProgramState -> IO [Button]
+cellsToRow _ [] _ _ = return []
+cellsToRow (i, j) (x:xs) table ref = do
+	buttonList <- cellsToRow (i, (j+1)) xs table ref
+	button <- buttonNew
+	button `on` buttonPressEvent $ tryEvent $ do
+		LeftButton <- eventButton
+		ps <- liftIO $ readIORef ref
+		let newBoard = click (i, j) (board ps)
+		liftIO $ writeIORef ref $ ProgramState (mainWindow ps) (optionsWindow ps) newBoard (buttons ps) (options ps)
+		liftIO $ updateTable ref
+	button `on` buttonPressEvent $ tryEvent $ do
+		RightButton <- eventButton
+		ps <- liftIO $ readIORef ref
+		let newBoard = flag (i, j) (board ps)
+		liftIO $ writeIORef ref $ ProgramState (mainWindow ps) (optionsWindow ps) newBoard (buttons ps) (options ps)
+		liftIO $ updateTable ref
+	let newButtonList = button : buttonList
+	tableAttachDefaults table button i (i+1) j (j+1)
+	return newButtonList
+
+updateTable :: IORef ProgramState -> IO ()
+updateTable ref = do
+	ps <- readIORef ref
+	let buttonTable = buttons ps
+	let b = val $ board ps
+	putStrLn $ show $ board ps
+	updateRow 0 b buttonTable
+
+updateRow :: Int -> [[Cell]] -> [[Button]] -> IO ()
+updateRow _ [] _ = return ()
+updateRow i (xs:xss) buttonTable = do
+	updateRow (i+1) xss buttonTable
+	updateCell (i, 0) xs buttonTable
+
+updateCell :: (Int, Int) -> [Cell] -> [[Button]] -> IO ()
+updateCell _ [] _ = return ()
+updateCell (i,j) (x:xs) buttonTable = do
+	updateCell (i, (j+1)) xs buttonTable
+	cellToButton x ((buttonTable!!i)!!j)
+
+
+-- create a gtk button from a cell
+cellToButton :: Cell -> Button -> IO ()
+cellToButton (Masked _) button = do
+	image <- imageNewFromFile "masked.png"
+	buttonSetImage button image
+cellToButton (Flagged _) button = do
+	button <- buttonNew
+	image <- imageNewFromFile "flag.png"
+	buttonSetImage button image
+cellToButton (Clicked (-1)) button = do
+	button <- buttonNew
+	image <- imageNewFromFile "mine.png"
+	buttonSetImage button image
+cellToButton (Clicked x) button = do
+	buttonSetLabel button (show x)
