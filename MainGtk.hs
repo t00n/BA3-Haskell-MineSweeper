@@ -146,6 +146,14 @@ initTimer ref = do
 	let label = labelTimer ps
 	labelSetText label "0"
 
+updateTimer :: IORef ProgramState -> IO ()
+updateTimer ref = do
+	ps <- readIORef ref
+	let label = labelTimer ps
+	let oldTime = timer ps
+	let newTime = currentTime
+	labelSetText label $ show (newTime - oldTime)
+
 
 -- table
 updateTable :: IORef ProgramState -> IO ()
