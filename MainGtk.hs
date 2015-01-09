@@ -18,6 +18,7 @@ data Options = Options {
 data ProgramState = ProgramState {
 	mainWindow :: Window,
 	optionsWindow :: Window,
+	nbOfMines :: Label,
 	buttonSmiley :: Button,
 	board :: MyBoard,
 	buttons :: [[Button]],
@@ -29,18 +30,19 @@ dummyProgramState = do
 	mainW <- windowNew
 	optionsW <- windowNew
 	button <- buttonNew
+	nbOfMines <- labelNew $ Just "0"
 	let b = initialize 0 (0,0) (0,0)
 	let opt = Options 0 (0,0) (0,0)
-	return $ ProgramState mainW optionsW button b [[]] opt
+	return $ ProgramState mainW optionsW nbOfMines button b [[]] opt
 
 setBoard :: MyBoard -> ProgramState -> ProgramState
-setBoard b ps = ProgramState (mainWindow ps) (optionsWindow ps) (buttonSmiley ps) b (buttons ps) (options ps)
+setBoard b ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) b (buttons ps) (options ps)
 
 setButtons :: [[Button]] -> ProgramState -> ProgramState
-setButtons b ps = ProgramState (mainWindow ps) (optionsWindow ps) (buttonSmiley ps) (board ps) b (options ps)
+setButtons b ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) (board ps) b (options ps)
 
 setOptions :: Options -> ProgramState -> ProgramState
-setOptions opt ps = ProgramState (mainWindow ps) (optionsWindow ps) (buttonSmiley ps) (board ps) (buttons ps) opt
+setOptions opt ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) (board ps) (buttons ps) opt
 
 main :: IO ()
 main = do
@@ -69,6 +71,8 @@ setStateWon ref = do
 setStateIngame :: IORef ProgramState -> IO ()
 setStateIngame ref = do
 	setButtonSmileImage "smiley_ingame.jpg" ref
+	buildTable ref
+	initNbOfMines ref
 	activateTable ref
 
 setStateLost :: IORef ProgramState -> IO ()
@@ -98,6 +102,23 @@ emptyButton :: Button -> IO ()
 emptyButton button = do
 	children <- containerGetChildren button
 	containerForeach button (containerRemove button)
+
+-- info box
+initNbOfMines :: IORef ProgramState -> IO ()
+initNbOfMines ref = do
+	ps <- readIORef ref
+	let b = board ps
+	let labelMines = nbOfMines ps
+	let minesTotal = foldr (\xs acc -> acc + foldr (\x acc -> if x == (Masked True) then (acc+1) else acc) 0 xs) 0 (val b)
+	labelSetText labelMines (show minesTotal)
+
+setButtonSmileImage :: String -> IORef ProgramState -> IO ()
+setButtonSmileImage filename ref = do
+	ps <- readIORef ref
+	let buttonSmile = buttonSmiley ps
+	emptyButton buttonSmile
+	image <- imageNewFromFile filename
+	buttonSetImage buttonSmile image
 
 -- table
 updateTable :: IORef ProgramState -> IO ()
@@ -153,43 +174,40 @@ deActivateTable ref = do
 	mapM (mapM $ flip widgetSetSensitive False) buttonTable
 	return ()
 
--- button smile
-setButtonSmileImage :: String -> IORef ProgramState -> IO ()
-setButtonSmileImage filename ref = do
-	ps <- readIORef ref
-	let buttonSmile = buttonSmiley ps
-	emptyButton buttonSmile
-	image <- imageNewFromFile filename
-	buttonSetImage buttonSmile image
-
-
 -------- build GUI methods --------
 buildMainWindow :: IORef ProgramState -> IO Window
 buildMainWindow ref = do
 	ps <- readIORef ref
 	let w = mainWindow ps
-	-- menu
+	-- menu --
 	menuBar <- menuBarNew
-	fileMenuItem <- menuItemNewWithLabel "File"
-	containerAdd menuBar fileMenuItem
-	fileMenu <- menuNew
-	menuItemSetSubmenu fileMenuItem fileMenu
+	gameMenuItem <- menuItemNewWithLabel "Game"
+	containerAdd menuBar gameMenuItem
+	gameMenu <- menuNew
+	menuItemSetSubmenu gameMenuItem gameMenu
 	newMenuItem <- menuItemNewWithLabel "New"
-	containerAdd fileMenu newMenuItem
+	containerAdd gameMenu newMenuItem
 	on newMenuItem menuItemActivate (showOptionsWindow ref)
 	quitMenuItem <- menuItemNewWithLabel "Quit"
-	containerAdd fileMenu quitMenuItem
+	containerAdd gameMenu quitMenuItem
 	on quitMenuItem menuItemActivate mainQuit
+	-- infos --
+	infoBox <- hBoxNew False 0
+	-- nb of mines
+	let labelMines = nbOfMines ps
 	-- button smiley
 	let buttonSmile = buttonSmiley ps
 	onClicked buttonSmile $ resetGame ref
-	-- table
+	-- infoBox
+	containerAdd infoBox labelMines
+	containerAdd infoBox buttonSmile
+	-- table -- 
 	table <- tableNew 0 0 True
-	-- vbox
+	-- vbox --
 	vbox <- vBoxNew False 0
 	GTK.set w [ containerChild := vbox ]
 	containerAdd vbox menuBar
-	containerAdd vbox buttonSmile
+	containerAdd vbox infoBox
 	containerAdd vbox table
 	onDestroy w mainQuit
 	return w
@@ -216,7 +234,6 @@ buildOptionsWindow ref = do
 		let b = initialize (read seed) (read size) (read click)
 		let newPS = setBoard b (setOptions opt ps)
 		writeIORef ref newPS
-		buildTable ref
 		setStateIngame ref
 		showMainWindow ref
 	-- put objects in container
