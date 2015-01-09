@@ -52,6 +52,36 @@ main = do
 	showOptionsWindow ref
 	mainGUI
 
+-------- game methods --------
+resetGame :: IORef ProgramState -> IO ()
+resetGame ref = do
+	ps <- readIORef ref
+	let opt = options ps
+	writeIORef ref $ setBoard (initialize (seed opt) (size opt) (firstClick opt)) ps
+	updateTable ref
+	setStateIngame ref
+
+setStateWon :: IORef ProgramState -> IO ()
+setStateWon ref = do
+	setButtonSmileImage "smiley_won.jpg" ref
+	deActivateTable ref
+
+setStateIngame :: IORef ProgramState -> IO ()
+setStateIngame ref = do
+	setButtonSmileImage "smiley_ingame.jpg" ref
+	activateTable ref
+
+setStateLost :: IORef ProgramState -> IO ()
+setStateLost ref = do
+	ps <- readIORef ref
+	let b = board ps
+	writeIORef ref $ setBoard (reveal b) ps
+	updateTable ref
+	setButtonSmileImage "smiley_lost.jpg" ref
+	deActivateTable ref
+
+-------- update GUI methods --------
+-- global
 showMainWindow :: IORef ProgramState -> IO ()
 showMainWindow ref = do
 	ps <- readIORef ref
@@ -64,15 +94,10 @@ showOptionsWindow ref = do
 	widgetShowAll (optionsWindow ps)
 	widgetHide (mainWindow ps)
 
--------- update GUI methods --------
--- game
-resetGame :: IORef ProgramState -> IO ()
-resetGame ref = do
-	ps <- readIORef ref
-	let opt = options ps
-	writeIORef ref $ setBoard (initialize (seed opt) (size opt) (firstClick opt)) ps
-	updateTable ref
-	setStateIngame ref
+emptyButton :: Button -> IO ()
+emptyButton button = do
+	children <- containerGetChildren button
+	containerForeach button (containerRemove button)
 
 -- table
 updateTable :: IORef ProgramState -> IO ()
@@ -128,31 +153,7 @@ deActivateTable ref = do
 	mapM (mapM $ flip widgetSetSensitive False) buttonTable
 	return ()
 
-emptyButton :: Button -> IO ()
-emptyButton button = do
-	children <- containerGetChildren button
-	containerForeach button (containerRemove button)
-
 -- button smile
-setStateWon :: IORef ProgramState -> IO ()
-setStateWon ref = do
-	setButtonSmileImage "smiley_won.jpg" ref
-	deActivateTable ref
-
-setStateIngame :: IORef ProgramState -> IO ()
-setStateIngame ref = do
-	setButtonSmileImage "smiley_ingame.jpg" ref
-	activateTable ref
-
-setStateLost :: IORef ProgramState -> IO ()
-setStateLost ref = do
-	ps <- readIORef ref
-	let b = board ps
-	writeIORef ref $ setBoard (reveal b) ps
-	updateTable ref
-	setButtonSmileImage "smiley_lost.jpg" ref
-	deActivateTable ref
-
 setButtonSmileImage :: String -> IORef ProgramState -> IO ()
 setButtonSmileImage filename ref = do
 	ps <- readIORef ref
@@ -167,12 +168,22 @@ buildMainWindow :: IORef ProgramState -> IO Window
 buildMainWindow ref = do
 	ps <- readIORef ref
 	let w = mainWindow ps
+	-- menu
+	menuBar <- menuBarNew
+	fileMenuItem <- menuItemNewWithLabel "File"
+	containerAdd menuBar fileMenuItem
+	fileMenu <- menuNew
+	menuItemSetSubmenu fileMenuItem fileMenu
+	newMenuItem <- menuItemNewWithLabel "New"
+	containerAdd fileMenu newMenuItem
+	on newMenuItem menuItemActivate (showOptionsWindow ref)
 	-- button smiley
 	let buttonSmile = buttonSmiley ps
 	onClicked buttonSmile $ resetGame ref
 	-- vbox
 	vbox <- vBoxNew False 0
 	GTK.set w [ containerChild := vbox ]
+	containerAdd vbox menuBar
 	containerAdd vbox buttonSmile
 	onDestroy w mainQuit
 	return w
