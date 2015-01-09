@@ -20,6 +20,8 @@ data ProgramState = ProgramState {
 	optionsWindow :: Window,
 	nbOfMines :: Label,
 	buttonSmiley :: Button,
+	timer :: TimeStamp,
+	labelTimer :: Label,
 	board :: MyBoard,
 	buttons :: [[Button]],
 	options :: Options
@@ -31,18 +33,22 @@ dummyProgramState = do
 	optionsW <- windowNew
 	button <- buttonNew
 	nbOfMines <- labelNew $ Just "0"
+	labelTimer <- labelNew $ Just "0"
 	let b = initialize 0 (0,0) (0,0)
 	let opt = Options 0 (0,0) (0,0)
-	return $ ProgramState mainW optionsW nbOfMines button b [[]] opt
+	return $ ProgramState mainW optionsW nbOfMines button 0 labelTimer b [[]] opt
+
+setTimer :: ProgramState -> ProgramState
+setTimer ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) currentTime (labelTimer ps) (board ps) (buttons ps) (options ps)
 
 setBoard :: MyBoard -> ProgramState -> ProgramState
-setBoard b ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) b (buttons ps) (options ps)
+setBoard b ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) (timer ps) (labelTimer ps) b (buttons ps) (options ps)
 
 setButtons :: [[Button]] -> ProgramState -> ProgramState
-setButtons b ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) (board ps) b (options ps)
+setButtons b ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) (timer ps) (labelTimer ps) (board ps) b (options ps)
 
 setOptions :: Options -> ProgramState -> ProgramState
-setOptions opt ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) (board ps) (buttons ps) opt
+setOptions opt ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) (timer ps) (labelTimer ps) (board ps) (buttons ps) opt
 
 main :: IO ()
 main = do
@@ -133,6 +139,14 @@ setButtonSmileImage filename ref = do
 	image <- imageNewFromFile filename
 	buttonSetImage buttonSmile image
 
+initTimer :: IORef ProgramState -> IO ()
+initTimer ref = do
+	ps <- readIORef ref
+	writeIORef ref $ setTimer ps
+	let label = labelTimer ps
+	labelSetText label "0"
+
+
 -- table
 updateTable :: IORef ProgramState -> IO ()
 updateTable ref = do
@@ -211,9 +225,12 @@ buildMainWindow ref = do
 	-- button smiley
 	let buttonSmile = buttonSmiley ps
 	onClicked buttonSmile $ resetGame ref
+	-- timer
+	let labelTime = labelTimer ps
 	-- infoBox
 	containerAdd infoBox labelMines
 	containerAdd infoBox buttonSmile
+	containerAdd infoBox labelTime
 	-- table -- 
 	table <- tableNew 0 0 True
 	-- vbox --
