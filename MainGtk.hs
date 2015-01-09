@@ -177,6 +177,9 @@ buildMainWindow ref = do
 	newMenuItem <- menuItemNewWithLabel "New"
 	containerAdd fileMenu newMenuItem
 	on newMenuItem menuItemActivate (showOptionsWindow ref)
+	quitMenuItem <- menuItemNewWithLabel "Quit"
+	containerAdd fileMenu quitMenuItem
+	on quitMenuItem menuItemActivate mainQuit
 	-- button smiley
 	let buttonSmile = buttonSmiley ps
 	onClicked buttonSmile $ resetGame ref
