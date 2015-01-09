@@ -20,8 +20,8 @@ data ProgramState = ProgramState {
 	optionsWindow :: Window,
 	nbOfMines :: Label,
 	buttonSmiley :: Button,
-	timer :: TimeStamp,
 	labelTimer :: Label,
+	functionTimer :: HandlerId,
 	board :: MyBoard,
 	buttons :: [[Button]],
 	options :: Options
@@ -36,19 +36,19 @@ dummyProgramState = do
 	labelTimer <- labelNew $ Just "0"
 	let b = initialize 0 (0,0) (0,0)
 	let opt = Options 0 (0,0) (0,0)
-	return $ ProgramState mainW optionsW nbOfMines button 0 labelTimer b [[]] opt
+	return $ ProgramState mainW optionsW nbOfMines button labelTimer 0 b [[]] opt
 
-setTimer :: ProgramState -> ProgramState
-setTimer ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) currentTime (labelTimer ps) (board ps) (buttons ps) (options ps)
+setTimerFunction :: HandlerId -> ProgramState -> ProgramState
+setTimerFunction f ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) (labelTimer ps) f (board ps) (buttons ps) (options ps)
 
 setBoard :: MyBoard -> ProgramState -> ProgramState
-setBoard b ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) (timer ps) (labelTimer ps) b (buttons ps) (options ps)
+setBoard b ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) (labelTimer ps) (functionTimer ps) b (buttons ps) (options ps)
 
 setButtons :: [[Button]] -> ProgramState -> ProgramState
-setButtons b ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) (timer ps) (labelTimer ps) (board ps) b (options ps)
+setButtons b ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) (labelTimer ps) (functionTimer ps) (board ps) b (options ps)
 
 setOptions :: Options -> ProgramState -> ProgramState
-setOptions opt ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) (timer ps) (labelTimer ps) (board ps) (buttons ps) opt
+setOptions opt ps = ProgramState (mainWindow ps) (optionsWindow ps) (nbOfMines ps) (buttonSmiley ps) (labelTimer ps) (functionTimer ps) (board ps) (buttons ps) opt
 
 main :: IO ()
 main = do
@@ -78,6 +78,7 @@ setStateIngame :: IORef ProgramState -> IO ()
 setStateIngame ref = do
 	setButtonSmileImage "smiley_ingame.jpg" ref
 	initNbOfMines ref
+	resetTimer ref
 	activateTable ref
 
 setStateLost :: IORef ProgramState -> IO ()
@@ -139,20 +140,33 @@ setButtonSmileImage filename ref = do
 	image <- imageNewFromFile filename
 	buttonSetImage buttonSmile image
 
-initTimer :: IORef ProgramState -> IO ()
-initTimer ref = do
+resetTimer :: IORef ProgramState -> IO ()
+resetTimer ref = do
 	ps <- readIORef ref
-	writeIORef ref $ setTimer ps
 	let label = labelTimer ps
 	labelSetText label "0"
+	let function = functionTimer ps
+	timeoutRemove function
+	writeIORef ref $ setTimerFunction 0 ps
+	return ()
 
-updateTimer :: IORef ProgramState -> IO ()
+startTimer :: IORef ProgramState -> IO ()
+startTimer ref = do
+	ps <- readIORef ref
+	if (functionTimer ps) == 0 then do
+		function <- timeoutAdd (updateTimer ref) 1000
+		writeIORef ref $ setTimerFunction function ps
+	else return ()
+	return ()
+
+updateTimer :: IORef ProgramState -> IO Bool
 updateTimer ref = do
 	ps <- readIORef ref
 	let label = labelTimer ps
-	let oldTime = timer ps
-	let newTime = currentTime
-	labelSetText label $ show (newTime - oldTime)
+	labelText <- labelGetText label
+	labelSetText label $ show $ (read labelText)+1
+	let b = board ps
+	return $ not $ (won b) || (lost b)
 
 
 -- table
@@ -339,4 +353,5 @@ onClickedCell callback ref = do
 	liftIO $ updateTable ref
 	liftIO $ if won newBoard then setStateWon ref else return ()
 	liftIO $ if lost newBoard then setStateLost ref else return ()
+	liftIO $ startTimer ref
 
