@@ -180,11 +180,14 @@ buildMainWindow ref = do
 	-- button smiley
 	let buttonSmile = buttonSmiley ps
 	onClicked buttonSmile $ resetGame ref
+	-- table
+	table <- tableNew 0 0 True
 	-- vbox
 	vbox <- vBoxNew False 0
 	GTK.set w [ containerChild := vbox ]
 	containerAdd vbox menuBar
 	containerAdd vbox buttonSmile
+	containerAdd vbox table
 	onDestroy w mainQuit
 	return w
 
@@ -230,9 +233,11 @@ buildTable :: IORef ProgramState -> IO ()
 buildTable ref = do
 	ps <- readIORef ref
 	let b = board ps
-	table <- tableNew (width b) (height b) True
 	let w = mainWindow ps
 	Just vbox <- binGetChild w
+	children <- containerGetChildren (castToContainer vbox)
+	widgetDestroy $ head $ reverse $ children
+	table <- tableNew (width b) (height b) True
 	containerAdd (castToContainer vbox) table
 	buttonTable <- cellsToTable 0 (val b) table ref
 	writeIORef ref $ setButtons buttonTable ps
