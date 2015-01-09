@@ -1,0 +1,8 @@
+utiliser les Class plutot que les types
+encapsuler IORef dans un monad transformer
+timer
+expand sur le middle click
+refact all
+changer le test pour le mine counter dans onClicked des buttons
+affichage en batonnets
+options window -> dialog
