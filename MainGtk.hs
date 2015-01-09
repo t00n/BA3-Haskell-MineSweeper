@@ -71,7 +71,6 @@ setStateWon ref = do
 setStateIngame :: IORef ProgramState -> IO ()
 setStateIngame ref = do
 	setButtonSmileImage "smiley_ingame.jpg" ref
-	buildTable ref
 	initNbOfMines ref
 	activateTable ref
 
@@ -111,6 +110,20 @@ initNbOfMines ref = do
 	let labelMines = nbOfMines ps
 	let minesTotal = foldr (\xs acc -> acc + foldr (\x acc -> if x == (Masked True) then (acc+1) else acc) 0 xs) 0 (val b)
 	labelSetText labelMines (show minesTotal)
+
+decNbOfMines :: IORef ProgramState -> IO ()
+decNbOfMines ref = modifyNbOfMines (subtract 1) ref
+
+incNbOfMines :: IORef ProgramState -> IO ()
+incNbOfMines ref = modifyNbOfMines (+1) ref
+
+modifyNbOfMines :: (Int -> Int) -> IORef ProgramState -> IO ()
+modifyNbOfMines f ref = do
+	ps <- readIORef ref
+	let labelMines = nbOfMines ps
+	text <- labelGetText labelMines
+	let n = read text
+	labelSetText labelMines $ show (f n)
 
 setButtonSmileImage :: String -> IORef ProgramState -> IO ()
 setButtonSmileImage filename ref = do
@@ -234,6 +247,7 @@ buildOptionsWindow ref = do
 		let b = initialize (read seed) (read size) (read click)
 		let newPS = setBoard b (setOptions opt ps)
 		writeIORef ref newPS
+		buildTable ref
 		setStateIngame ref
 		showMainWindow ref
 	-- put objects in container
@@ -281,6 +295,12 @@ cellsToRow (i, j) (x:xs) table ref = do
 		onClickedCell (click (i,j)) ref
 	button `on` buttonPressEvent $ tryEvent $ do
 		RightButton <- eventButton
+		ps <- liftIO $ readIORef ref
+		let b = board ps
+		liftIO $ if (Board.get (i,j) b) == (Masked True) then decNbOfMines ref else return ()
+		liftIO $ if (Board.get (i,j) b) == (Flagged True) then incNbOfMines ref else return ()
+		liftIO $ if (Board.get (i,j) b) == (Masked False) then decNbOfMines ref else return ()
+		liftIO $ if (Board.get (i,j) b) == (Flagged False) then incNbOfMines ref else return ()
 		onClickedCell (flag (i,j)) ref
 	tableAttachDefaults table button i (i+1) j (j+1)
 	let newButtonList = button : buttonList
