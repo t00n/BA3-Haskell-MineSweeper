@@ -118,14 +118,14 @@ activateTable :: IORef ProgramState -> IO ()
 activateTable ref = do
 	ps <- readIORef ref
 	let buttonTable = buttons ps
-	return $ map (map (flip widgetSetSensitive True)) buttonTable
+	mapM (mapM (flip widgetSetSensitive True)) buttonTable
 	return ()
 
 deActivateTable :: IORef ProgramState -> IO ()
 deActivateTable ref = do
 	ps <- readIORef ref
 	let buttonTable = buttons ps
-	return $ map (map $ flip widgetSetSensitive False) buttonTable
+	mapM (mapM $ flip widgetSetSensitive False) buttonTable
 	return ()
 
 emptyButton :: Button -> IO ()
@@ -146,6 +146,10 @@ setStateIngame ref = do
 
 setStateLost :: IORef ProgramState -> IO ()
 setStateLost ref = do
+	ps <- readIORef ref
+	let b = board ps
+	writeIORef ref $ setBoard (reveal b) ps
+	updateTable ref
 	setButtonSmileImage "smiley_lost.jpg" ref
 	deActivateTable ref
 
