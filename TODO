@@ -1,6 +1,11 @@
-utiliser les Class plutot que les types
-affichage en batonnets
+commentaires
 refact all
-encapsuler IORef dans un monad transformer
+
+FACULTATIF
+affichage en batonnets
 expand sur le middle click
 options window -> dialog
+
+HOW ?
+utiliser les Class plutot que les types
+encapsuler IORef dans un monad transformer
