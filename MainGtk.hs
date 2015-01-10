@@ -335,11 +335,9 @@ cellsToRow (i, j) (x:xs) table ref = do
 	button `on` buttonPressEvent $ tryEvent $ do
 		RightButton <- eventButton
 		ps <- liftIO $ readIORef ref
-		let b = board ps
-		liftIO $ if (Board.get (i,j) b) == (Masked True) then decNbOfMines ref else return ()
-		liftIO $ if (Board.get (i,j) b) == (Flagged True) then incNbOfMines ref else return ()
-		liftIO $ if (Board.get (i,j) b) == (Masked False) then decNbOfMines ref else return ()
-		liftIO $ if (Board.get (i,j) b) == (Flagged False) then incNbOfMines ref else return ()
+		let cell = Board.get (i,j) (board ps)
+		liftIO $ if cell == (Masked True) || cell == (Masked False) then decNbOfMines ref else return ()
+		liftIO $ if cell == (Flagged True) || cell == (Flagged False) then incNbOfMines ref else return ()
 		onClickedCell (flag (i,j)) ref
 	tableAttachDefaults table button i (i+1) j (j+1)
 	let newButtonList = button : buttonList
