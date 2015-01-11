@@ -21,6 +21,8 @@ main = do
 	mainGUI
 
 -------- game methods --------
+-- called when the smiley button is clicked
+-- initialize the game board and the table according to the options in the state
 resetGame :: IORef ProgramState -> IO ()
 resetGame ref = do
 	ps <- readIORef ref
@@ -29,11 +31,19 @@ resetGame ref = do
 	updateTable ref
 	setStateIngame ref
 
+-- called when the game is won
+-- deactivates the table
+-- changes the image on the smiley button
 setStateWon :: IORef ProgramState -> IO ()
 setStateWon ref = do
 	setButtonSmileImage "smiley_won.jpg" ref
 	deActivateTable ref
 
+-- called when the game starts or is reset
+-- activates the table
+-- changes the image on the smiley button
+-- resets the timer
+-- sets the number of mines label
 setStateIngame :: IORef ProgramState -> IO ()
 setStateIngame ref = do
 	setButtonSmileImage "smiley_ingame.jpg" ref
@@ -41,6 +51,10 @@ setStateIngame ref = do
 	resetTimer ref
 	activateTable ref
 
+-- called when the game is lost
+-- deactivates the table to prevent any further clicks
+-- change the image on the smiley button to a sad smiley
+-- reveals the entire board to the user
 setStateLost :: IORef ProgramState -> IO ()
 setStateLost ref = do
 	ps <- readIORef ref
@@ -51,25 +65,21 @@ setStateLost ref = do
 	deActivateTable ref
 
 -------- update GUI methods --------
--- global
+-- show the main window and hide the options window
 showMainWindow :: IORef ProgramState -> IO ()
 showMainWindow ref = do
 	ps <- readIORef ref
 	widgetShowAll (mainWindow ps)
 	widgetHide (optionsWindow ps)
 
+-- show the options window and hide the main window
 showOptionsWindow :: IORef ProgramState -> IO ()
 showOptionsWindow ref = do
 	ps <- readIORef ref
 	widgetShowAll (optionsWindow ps)
 	widgetHide (mainWindow ps)
 
-emptyButton :: Button -> IO ()
-emptyButton button = do
-	children <- containerGetChildren button
-	containerForeach button (containerRemove button)
-
--- info box
+-- set the value ot the number of mines label to the actual number of mines in the game board
 initNbOfMines :: IORef ProgramState -> IO ()
 initNbOfMines ref = do
 	ps <- readIORef ref
@@ -84,6 +94,7 @@ decNbOfMines ref = modifyNbOfMines (subtract 1) ref
 incNbOfMines :: IORef ProgramState -> IO ()
 incNbOfMines ref = modifyNbOfMines (+1) ref
 
+-- apply a function on the value of the number of mines label
 modifyNbOfMines :: (Int -> Int) -> IORef ProgramState -> IO ()
 modifyNbOfMines f ref = do
 	ps <- readIORef ref
@@ -92,14 +103,17 @@ modifyNbOfMines f ref = do
 	let n = read text
 	labelSetText labelMines $ show (f n)
 
+-- change the image of the big smiley button in the info bar
+-- takes a path to the file of the image as a parameter
 setButtonSmileImage :: String -> IORef ProgramState -> IO ()
 setButtonSmileImage filename ref = do
 	ps <- readIORef ref
 	let buttonSmile = buttonSmiley ps
-	emptyButton buttonSmile
+	containerForeach buttonSmile (containerRemove buttonSmile)
 	image <- imageNewFromFile filename
 	buttonSetImage buttonSmile image
 
+-- set the timer label to 0 and remove the timer function from the state
 resetTimer :: IORef ProgramState -> IO ()
 resetTimer ref = do
 	ps <- readIORef ref
@@ -110,6 +124,7 @@ resetTimer ref = do
 	writeIORef ref $ setTimerFunction 0 ps
 	return ()
 
+-- start a timer function if one does not exist yet
 startTimer :: IORef ProgramState -> IO ()
 startTimer ref = do
 	ps <- readIORef ref
@@ -117,8 +132,8 @@ startTimer ref = do
 		function <- timeoutAdd (updateTimer ref) 1000
 		writeIORef ref $ setTimerFunction function ps
 	else return ()
-	return ()
 
+-- function called each second during a game to increment the timer
 updateTimer :: IORef ProgramState -> IO Bool
 updateTimer ref = do
 	ps <- readIORef ref
@@ -129,7 +144,8 @@ updateTimer ref = do
 	return $ not $ (won b) || (lost b)
 
 
--- table
+-- update the label and/or the image of each button in the table
+-- according to the matching cell in the game board
 updateTable :: IORef ProgramState -> IO ()
 updateTable ref = do
 	ps <- readIORef ref
@@ -149,26 +165,25 @@ updateCell (i,j) (x:xs) buttonTable = do
 	updateCell (i, (j+1)) xs buttonTable
 	cellToButton x ((buttonTable!!i)!!j)
 
+-- change the label and/or the image of a button according to a cell
 cellToButton :: Cell -> Button -> IO ()
 cellToButton (Masked _) button = do
-	emptyButton button
 	image <- imageNewFromFile "masked.png"
 	buttonSetImage button image
 	buttonSetLabel button ""
 cellToButton (Flagged _) button = do
-	emptyButton button
 	image <- imageNewFromFile "flag.png"
 	buttonSetImage button image
 	buttonSetLabel button ""
 cellToButton (Clicked (-1)) button = do
-	emptyButton button
 	image <- imageNewFromFile "mine.png"
 	buttonSetImage button image
 	buttonSetLabel button ""
 cellToButton (Clicked x) button = do
-	emptyButton button
 	buttonSetLabel button (show x)
 
+-- called on the beginning of a new game
+-- activate all buttons in the table
 activateTable :: IORef ProgramState -> IO ()
 activateTable ref = do
 	ps <- readIORef ref
@@ -176,6 +191,8 @@ activateTable ref = do
 	mapM (mapM (flip widgetSetSensitive True)) buttonTable
 	return ()
 
+-- called on the end of game (won or lost)
+-- grey out all the buttons in the table
 deActivateTable :: IORef ProgramState -> IO ()
 deActivateTable ref = do
 	ps <- readIORef ref
@@ -184,11 +201,33 @@ deActivateTable ref = do
 	return ()
 
 -------- build GUI methods --------
-buildMainWindow :: IORef ProgramState -> IO Window
+-- The main window contains a menu bar, an info bar and the table
+buildMainWindow :: IORef ProgramState -> IO ()
 buildMainWindow ref = do
 	ps <- readIORef ref
+	-- menu
+	menuBar <- buildMenu ref
+	-- info bar
+	infoBox <- hBoxNew False 0
+	onClicked (buttonSmiley ps) $ resetGame ref
+	containerAdd infoBox (nbOfMines ps)
+	containerAdd infoBox (buttonSmiley ps)
+	containerAdd infoBox (labelTimer ps)
+	-- game table
+	table <- tableNew 0 0 True
+	-- add everything in window
+	vbox <- vBoxNew False 0
+	containerAdd vbox menuBar
+	containerAdd vbox infoBox
+	containerAdd vbox table
 	let w = mainWindow ps
-	-- menu --
+	GTK.set w [ containerChild := vbox ]
+	onDestroy w mainQuit
+	return ()
+
+-- build menu and returns the menu bar
+buildMenu :: IORef ProgramState -> IO MenuBar
+buildMenu ref = do
 	menuBar <- menuBarNew
 	gameMenuItem <- menuItemNewWithLabel "Game"
 	containerAdd menuBar gameMenuItem
@@ -200,36 +239,15 @@ buildMainWindow ref = do
 	quitMenuItem <- menuItemNewWithLabel "Quit"
 	containerAdd gameMenu quitMenuItem
 	on quitMenuItem menuItemActivate mainQuit
-	-- infos --
-	infoBox <- hBoxNew False 0
-	-- nb of mines
-	let labelMines = nbOfMines ps
-	-- button smiley
-	let buttonSmile = buttonSmiley ps
-	onClicked buttonSmile $ resetGame ref
-	-- timer
-	let labelTime = labelTimer ps
-	-- infoBox
-	containerAdd infoBox labelMines
-	containerAdd infoBox buttonSmile
-	containerAdd infoBox labelTime
-	-- table -- 
-	table <- tableNew 0 0 True
-	-- vbox --
-	vbox <- vBoxNew False 0
-	GTK.set w [ containerChild := vbox ]
-	containerAdd vbox menuBar
-	containerAdd vbox infoBox
-	containerAdd vbox table
-	onDestroy w mainQuit
-	return w
+	return menuBar
 
-buildOptionsWindow :: IORef ProgramState -> IO Window
+-- The options window ask for a seed, the size of the board 
+-- and the first click and put them in the state
+buildOptionsWindow :: IORef ProgramState -> IO ()
 buildOptionsWindow ref = do
 	-- init
 	ps <- readIORef ref
 	let w = optionsWindow ps
-	vbox <- vBoxNew False 0
 	labelSeed <- labelNew $ Just "Seed"
 	entrySeed <- entryNew
 	labelSize <- labelNew $ Just "Size"
@@ -244,12 +262,12 @@ buildOptionsWindow ref = do
 		click <- entryGetText entryClick :: IO [Char]
 		let opt = Options (read seed) (read size) (read click)
 		let b = initialize (read seed) (read size) (read click)
-		let newPS = setBoard b (setOptions opt ps)
-		writeIORef ref newPS
+		writeIORef ref $ setBoard b (setOptions opt ps)
 		buildTable ref
 		setStateIngame ref
 		showMainWindow ref
 	-- put objects in container
+	vbox <- vBoxNew False 0
 	containerAdd vbox labelSeed
 	containerAdd vbox entrySeed
 	containerAdd vbox labelSize
@@ -257,23 +275,24 @@ buildOptionsWindow ref = do
 	containerAdd vbox labelClick
 	containerAdd vbox entryClick
 	containerAdd vbox buttonOk
-	-- window
 	GTK.set w [containerChild := vbox ]
 	onDestroy w mainQuit
-	return w
+	return ()
 
+-- builds the table and destroy the old one
 buildTable :: IORef ProgramState -> IO ()
 buildTable ref = do
 	ps <- readIORef ref
 	let b = board ps
-	let w = mainWindow ps
-	Just vbox <- binGetChild w
+	-- destroy old table
+	Just vbox <- binGetChild (mainWindow ps)
 	children <- containerGetChildren (castToContainer vbox)
 	widgetDestroy $ head $ reverse $ children
+	-- create new table
 	table <- tableNew (width b) (height b) True
 	containerAdd (castToContainer vbox) table
 	buttonTable <- cellsToTable 0 (val b) table ref
-	writeIORef ref $ setButtons buttonTable ps
+	modifyIORef ref $ setButtons buttonTable
 	updateTable ref
 
 cellsToTable :: Int -> [[Cell]] -> Table -> IORef ProgramState -> IO [[Button]]
@@ -281,8 +300,7 @@ cellsToTable _ [] _ _ = return []
 cellsToTable i (xs:xss) table ref = do
 	buttonTable <- cellsToTable (i+1) xss table ref
 	buttonList <- cellsToRow (i, 0) xs table ref
-	let newButtonTable = buttonList : buttonTable
-	return newButtonTable
+	return $ buttonList : buttonTable
 
 cellsToRow :: (Int, Int) -> [Cell] -> Table -> IORef ProgramState -> IO [Button]
 cellsToRow _ [] _ _ = return []
@@ -300,16 +318,19 @@ cellsToRow (i, j) (x:xs) table ref = do
 		liftIO $ if cell == (Flagged True) || cell == (Flagged False) then incNbOfMines ref else return ()
 		onClickedCell (flag (i,j)) ref
 	tableAttachDefaults table button i (i+1) j (j+1)
-	let newButtonList = button : buttonList
-	return newButtonList
+	return $ button : buttonList
 
+-- function called when a button in the table is clicked
+-- the callback is either the click function or the flag function
 onClickedCell :: (MyBoard -> MyBoard) -> IORef ProgramState -> EventM EButton ()
-onClickedCell callback ref = do
+onClickedCell f ref = do
 	ps <- liftIO $ readIORef ref
-	let newBoard = callback (board ps)
-	liftIO $ writeIORef ref $ setBoard newBoard ps
-	liftIO $ updateTable ref
-	liftIO $ if won newBoard then setStateWon ref else return ()
-	liftIO $ if lost newBoard then setStateLost ref else return ()
-	liftIO $ startTimer ref
+	let newBoard = f (board ps)
+	liftIO $ modifyIORef ref $ setBoard newBoard
+	liftIO $ if won newBoard then setStateWon ref else do
+		updateTable ref
+		startTimer ref
+	liftIO $ if lost newBoard then setStateLost ref else do
+		updateTable ref
+		startTimer ref
 
