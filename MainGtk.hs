@@ -128,10 +128,9 @@ resetTimer ref = do
 startTimer :: IORef ProgramState -> IO ()
 startTimer ref = do
 	ps <- readIORef ref
-	if (functionTimer ps) == 0 then do
+	when (functionTimer ps) == 0 $ do
 		function <- timeoutAdd (updateTimer ref) 1000
 		writeIORef ref $ setTimerFunction function ps
-	else return ()
 
 -- function called each second during a game to increment the timer
 updateTimer :: IORef ProgramState -> IO Bool
@@ -188,8 +187,7 @@ activateTable :: IORef ProgramState -> IO ()
 activateTable ref = do
 	ps <- readIORef ref
 	let buttonTable = buttons ps
-	mapM (mapM (flip widgetSetSensitive True)) buttonTable
-	return ()
+	mapM_ (mapM (flip widgetSetSensitive True)) buttonTable
 
 -- called on the end of game (won or lost)
 -- grey out all the buttons in the table
